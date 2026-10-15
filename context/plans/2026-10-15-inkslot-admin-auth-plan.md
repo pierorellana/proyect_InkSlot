@@ -30,8 +30,8 @@
 
 ## Pasos
 
-1. Escribir tests e2e para login, me, logout, expiración y credencial inválida.
-2. Agregar `admin_sessions` al esquema/migración Prisma.
-3. Implementar DTO, servicio y controller con cookie local segura y Argon2id.
-4. Ejecutar formato, build, tests e2e y revisar contrato.
+1. [x] Escribir tests e2e para login, me, logout, expiración y credencial inválida.
+2. [x] Agregar `admin_sessions` al esquema/migración Prisma.
+3. [x] Implementar DTO, servicio y controller con cookie local segura y Argon2id.
+4. [x] Ejecutar formato, build, tests e2e y revisar contrato.
 5. Registrar evidencia y crear commits pequeños de plan, código y documentación.

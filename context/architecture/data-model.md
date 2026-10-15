@@ -16,6 +16,7 @@
 | `sync_issues` | `id`, `appointment_id`, `operation`, `code`, `message_safe`, `status`, `last_attempt_at` |
 | `audit_logs` | `id`, `actor_type`, `actor_id?`, `entity_type`, `entity_id`, `action`, `changes jsonb`, `created_at` |
 | `idempotency_keys` | `key_hash`, `scope`, `request_hash`, `response_code`, `response_body jsonb`, `created_at`, `expires_at`; unique `(scope,key_hash)` |
+| `admin_sessions` | `artist_id FK`, `token_hash unique`, `expires_at`, `revoked_at?`, `created_at`, `last_seen_at`; cookie token nunca se guarda en claro |
 
 ## Estado de implementación
 
