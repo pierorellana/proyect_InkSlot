@@ -7,6 +7,7 @@ import { AvailabilityModule } from './availability/availability.module';
 import { CalendarModule } from './calendar/calendar.module';
 import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
+import { RequestsModule } from './requests/requests.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { HealthModule } from './health/health.module';
     AuthModule,
     AvailabilityModule,
     CalendarModule,
+    RequestsModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
