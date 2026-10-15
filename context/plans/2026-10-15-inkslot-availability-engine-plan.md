@@ -28,8 +28,8 @@
 
 ## Pasos
 
-1. Escribir pruebas de duración, pausas, ocupaciones, restricciones, timezone y Calendar offline.
-2. Implementar tipos de entrada/salida y error de dominio.
-3. Implementar materialización de ventanas locales y filtrado de intervalos UTC con Luxon.
-4. Ejecutar formato, lint, build y tests API.
+1. [x] Escribir pruebas de duración, pausas, ocupaciones, restricciones, timezone y Calendar offline.
+2. [x] Implementar tipos de entrada/salida y error de dominio.
+3. [x] Implementar materialización de ventanas locales y filtrado de intervalos UTC con Luxon.
+4. [x] Ejecutar formato, lint, build y tests API.
 5. Registrar evidencia y dejar el endpoint como siguiente slice explícito.

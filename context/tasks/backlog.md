@@ -35,4 +35,5 @@ Para cada T: spec citada, tests unit/widget/integration pertinentes, errores/loa
 - `T-004`: splash y bienvenida públicos implementados con animación 3D, skip intro y reduced motion.
 - `T-005`: modelo Prisma inicial, migración PostgreSQL, checks de rango y exclusión GiST implementados; concurrencia transaccional completa queda para confirmación.
 - `T-006`: login/me/logout local con Argon2id, cookie HttpOnly, sesión hash y throttling base implementados; guards de rutas admin y CSRF de despliegue quedan pendientes.
+- `T-008`: motor puro timezone-aware implementado con jornada, duración, paso, pausas, restricciones, bloqueos, ocupaciones, buffer, aviso, horizonte y fallo cerrado de Calendar; endpoint y repositorio quedan pendientes.
 - `T-012`: aún pendiente; la ruta de fechas actual es un placeholder hasta implementar disponibilidad y selección de horarios.
