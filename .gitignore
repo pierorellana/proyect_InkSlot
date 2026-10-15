@@ -1,0 +1,30 @@
+.DS_Store
+
+# Fuentes de referencia entregadas por el usuario; permanecen locales.
+context/references/InkSlot_Prototipo.html
+context/references/InkSlot_Prototipo.zip
+context/references/InkSlot_Documentacion_Tecnica.pdf
+
+# Secretos y configuración local.
+.env
+.env.*
+!.env.example
+
+# Flutter / Dart
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/build/
+app/.pub-cache/
+
+# Node / NestJS
+api/node_modules/
+api/dist/
+api/coverage/
+api/.env
+
+# Prisma local artifacts
+api/prisma/*.db
+api/prisma/*.db-journal
+

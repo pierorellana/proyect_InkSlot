@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "created": "2026-10-15",
+  "sources": [
+    "InkSlot_Prototipo.zip",
+    "InkSlot_Prototipo.html",
+    "InkSlot_Especificacion_Tecnica_MVP_v1.0.pdf"
+  ],
+  "stack": {
+    "frontend": "Flutter Web + Provider",
+    "backend": "NestJS",
+    "database": "PostgreSQL"
+  },
+  "documents": [
+    "00-governance/AGENTS.md",
+    "00-governance/source-of-truth.md",
+    "README.md",
+    "adr/ADR-001-workspace-stack.md",
+    "adr/ADR-002-booking-integrity-and-calendar.md",
+    "adr/ADR-003-auth-and-public-tokens.md",
+    "adr/ADR-004-design-fidelity-and-motion.md",
+    "architecture/api-contracts.md",
+    "architecture/data-model.md",
+    "architecture/solution.md",
+    "design/design-system-and-motion.md",
+    "design/prototype-inventory.md",
+    "open-questions.md",
+    "plans/implementation-plan.md",
+    "product/user-journeys.md",
+    "product/vision-and-scope.md",
+    "quality/acceptance-matrix.md",
+    "quality/test-strategy.md",
+    "quality/visual-parity.md",
+    "specs/01-auth-and-roles.md",
+    "specs/02-clients-and-deposits.md",
+    "specs/03-booking-requests-and-tokens.md",
+    "specs/04-availability-engine.md",
+    "specs/05-appointments-and-booking.md",
+    "specs/06-google-calendar.md",
+    "specs/07-admin-dashboard-and-config.md",
+    "specs/08-public-flutter-experience.md",
+    "tasks/backlog.md"
+  ]
+}
