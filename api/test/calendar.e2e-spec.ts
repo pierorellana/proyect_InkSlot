@@ -1,4 +1,8 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import {
+  INestApplication,
+  ServiceUnavailableException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { CalendarConnectionStatus } from '@prisma/client';
 import * as argon2 from 'argon2';
@@ -11,7 +15,11 @@ import {
 } from '../src/calendar/calendar.constants';
 import type { CalendarConfig } from '../src/calendar/calendar.config';
 import { CalendarCrypto } from '../src/calendar/calendar.crypto';
-import type { CalendarProvider } from '../src/calendar/calendar.provider';
+import {
+  CalendarProviderError,
+  type CalendarProvider,
+} from '../src/calendar/calendar.provider';
+import { CalendarService } from '../src/calendar/calendar.service';
 import { PrismaService } from '../src/database/prisma.service';
 
 jest.setTimeout(15_000);
@@ -33,6 +41,7 @@ describe('admin calendar connection', () => {
     listCalendars: jest
       .fn()
       .mockResolvedValue([{ id: 'inkslot-id', name: 'InkSlot' }]),
+    freeBusy: jest.fn().mockResolvedValue([]),
     revoke: jest.fn().mockResolvedValue(undefined),
   } as jest.Mocked<CalendarProvider>;
 
@@ -96,6 +105,7 @@ describe('admin calendar connection', () => {
   });
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     await prisma.calendarConnection.deleteMany({ where: { artistId } });
     await prisma.calendarOAuthState.deleteMany({ where: { artistId } });
     fakeProvider.exchangeCode.mockResolvedValue({
@@ -105,6 +115,7 @@ describe('admin calendar connection', () => {
       { id: 'inkslot-id', name: 'InkSlot' },
     ]);
     fakeProvider.revoke.mockResolvedValue(undefined);
+    fakeProvider.freeBusy.mockReset().mockResolvedValue([]);
     fakeCrypto.encrypt.mockImplementation(
       (value: string) => `encrypted:${value}`,
     );
@@ -236,6 +247,113 @@ describe('admin calendar connection', () => {
     expect(
       await prisma.calendarConnection.findUnique({ where: { artistId } }),
     ).toBeNull();
+  });
+
+  it('queries busy intervals using the persisted connected calendar without exposing tokens', async () => {
+    const connection = await prisma.calendarConnection.create({
+      data: {
+        artistId,
+        calendarId: 'inkslot-id',
+        calendarName: 'InkSlot',
+        encryptedRefreshToken: 'encrypted:refresh-token-secret',
+        status: CalendarConnectionStatus.CONNECTED,
+      },
+    });
+    const input = {
+      timeMin: new Date('2026-10-23T00:00:00Z'),
+      timeMax: new Date('2026-10-24T00:00:00Z'),
+      timeZone: 'America/Guayaquil',
+    };
+    const intervals = [
+      {
+        startAt: new Date('2026-10-23T15:00:00Z'),
+        endAt: new Date('2026-10-23T18:00:00Z'),
+      },
+    ];
+    fakeProvider.freeBusy.mockResolvedValue(intervals);
+
+    const result = await app.get(CalendarService).queryBusy(artistId, input);
+
+    expect(result).toEqual(intervals);
+    expect(fakeCrypto.decrypt).toHaveBeenCalledTimes(1);
+    expect(fakeCrypto.decrypt).toHaveBeenCalledWith(
+      connection.encryptedRefreshToken,
+    );
+    expect(fakeProvider.freeBusy.mock.calls).toHaveLength(1);
+    expect(fakeProvider.freeBusy.mock.calls[0]?.[0]).toEqual({
+      ...input,
+      calendarId: connection.calendarId,
+      refreshToken: 'refresh-token-secret',
+    });
+    expect(JSON.stringify(result)).not.toContain('refresh-token-secret');
+    expect(JSON.stringify(result)).not.toContain('encrypted:');
+    expect(
+      await prisma.calendarConnection.findUnique({ where: { artistId } }),
+    ).toMatchObject({ status: CalendarConnectionStatus.CONNECTED });
+  });
+
+  it('persists needs_reconnect after a provider authorization failure and hides sensitive details', async () => {
+    await prisma.calendarConnection.create({
+      data: {
+        artistId,
+        calendarId: 'inkslot-id',
+        calendarName: 'InkSlot',
+        encryptedRefreshToken: 'encrypted:refresh-token-secret',
+        status: CalendarConnectionStatus.CONNECTED,
+      },
+    });
+    const input = {
+      timeMin: new Date('2026-10-23T00:00:00Z'),
+      timeMax: new Date('2026-10-24T00:00:00Z'),
+      timeZone: 'America/Guayaquil',
+    };
+    const providerDetail = 'provider detail: refresh-token-secret';
+    fakeProvider.freeBusy.mockRejectedValue(
+      new CalendarProviderError('CALENDAR_REAUTH_REQUIRED', providerDetail),
+    );
+
+    const service = app.get(CalendarService);
+    const error: unknown = await service
+      .queryBusy(artistId, input)
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(ServiceUnavailableException);
+    if (!(error instanceof ServiceUnavailableException)) {
+      throw new Error('Expected a safe calendar unavailable exception');
+    }
+    expect(error.getStatus()).toBe(503);
+    expect(error.getResponse()).toEqual({
+      error: {
+        code: 'CALENDAR_UNAVAILABLE',
+        message: 'No fue posible verificar la disponibilidad del calendario',
+      },
+    });
+    const serializedError = JSON.stringify(error);
+    for (const sensitive of [
+      'refresh-token-secret',
+      'encrypted:',
+      'provider detail',
+      'CALENDAR_REAUTH_REQUIRED',
+    ]) {
+      expect(serializedError).not.toContain(sensitive);
+      expect(error.message).not.toContain(sensitive);
+    }
+    expect(
+      await prisma.calendarConnection.findUnique({ where: { artistId } }),
+    ).toMatchObject({ status: CalendarConnectionStatus.NEEDS_RECONNECT });
+
+    const status = await request(app.getHttpServer())
+      .get('/v1/admin/calendar/status')
+      .set('Cookie', cookies)
+      .expect(200);
+    expect(status.body).toMatchObject({ status: 'needs_reconnect' });
+    expect(status.text).not.toContain('refresh-token-secret');
+    expect(status.text).not.toContain('provider detail');
+
+    await expect(service.queryBusy(artistId, input)).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(fakeProvider.freeBusy.mock.calls).toHaveLength(1);
   });
 
   it('reports needs_reconnect and disconnects locally without appointments', async () => {
