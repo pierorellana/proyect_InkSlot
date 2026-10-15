@@ -6,6 +6,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { CalendarConnectionStatus } from '@prisma/client';
+import { IANAZone } from 'luxon';
 
 import { PrismaService } from '../database/prisma.service';
 import { CALENDAR_CONFIG, CALENDAR_PROVIDER } from './calendar.constants';
@@ -13,6 +14,7 @@ import type { CalendarConfig } from './calendar.config';
 import { CalendarCrypto } from './calendar.crypto';
 import {
   CalendarProviderError,
+  type CalendarBusyInterval,
   type CalendarProvider,
 } from './calendar.provider';
 import { CalendarStateService } from './calendar.state.service';
@@ -30,6 +32,12 @@ export type CalendarConnectResponse = {
   expiresAt: string;
 };
 
+export type CalendarBusyQueryInput = {
+  timeMin: Date;
+  timeMax: Date;
+  timeZone: string;
+};
+
 const safeError = (code: string, message: string) => ({
   error: { code, message },
 });
@@ -45,6 +53,67 @@ export class CalendarService {
     @Inject(CALENDAR_CONFIG)
     private readonly config: CalendarConfig,
   ) {}
+
+  async queryBusy(
+    artistId: string,
+    input: CalendarBusyQueryInput,
+  ): Promise<CalendarBusyInterval[]> {
+    this.requireConfigured();
+
+    try {
+      if (
+        !input ||
+        !(input.timeMin instanceof Date) ||
+        !(input.timeMax instanceof Date) ||
+        !Number.isFinite(input.timeMin.getTime()) ||
+        !Number.isFinite(input.timeMax.getTime()) ||
+        input.timeMin.getTime() >= input.timeMax.getTime() ||
+        typeof input.timeZone !== 'string' ||
+        /^[+-]/.test(input.timeZone) ||
+        !IANAZone.isValidZone(input.timeZone)
+      ) {
+        throw new Error('Invalid calendar busy query');
+      }
+
+      const connection = await this.prisma.calendarConnection.findUnique({
+        where: { artistId },
+      });
+      if (
+        !connection ||
+        connection.status !== CalendarConnectionStatus.CONNECTED
+      ) {
+        throw new Error('Calendar connection unavailable');
+      }
+
+      const refreshToken = this.crypto.decrypt(
+        connection.encryptedRefreshToken,
+      );
+      try {
+        return await this.provider.freeBusy({
+          refreshToken,
+          calendarId: connection.calendarId,
+          timeMin: input.timeMin,
+          timeMax: input.timeMax,
+          timeZone: input.timeZone,
+        });
+      } catch (error) {
+        if (
+          error instanceof CalendarProviderError &&
+          error.code === 'CALENDAR_REAUTH_REQUIRED'
+        ) {
+          await this.markNeedsReconnect(artistId);
+        }
+        throw error;
+      }
+    } catch {
+      throw new ServiceUnavailableException(
+        safeError(
+          'CALENDAR_UNAVAILABLE',
+          'No fue posible verificar la disponibilidad del calendario',
+        ),
+      );
+    }
+  }
 
   async status(artistId: string): Promise<CalendarStatusResponse> {
     const connection = await this.prisma.calendarConnection.findUnique({
