@@ -56,7 +56,11 @@ describe('persistence foundation', () => {
         },
       });
       const client = await prisma.client.create({
-        data: { name: 'Cliente de prueba', phone: '+593000000000' },
+        data: {
+          artistId: artist.id,
+          name: 'Cliente de prueba',
+          phone: '+593000000000',
+        },
       });
       const request = await prisma.bookingRequest.create({
         data: {
@@ -70,6 +74,7 @@ describe('persistence foundation', () => {
           maxDate: new Date('2026-11-30T00:00:00Z'),
           allowedWeekdays: [2, 3, 4, 5, 6],
         },
+        include: { client: true },
       });
       const token = await prisma.bookingToken.create({
         data: {
@@ -82,6 +87,7 @@ describe('persistence foundation', () => {
       expect(settings.timezone).toBe('America/Guayaquil');
       expect(weeklyAvailability.weekday).toBe(2);
       expect(request.status).toBe(BookingRequestStatus.PENDING);
+      expect(request.client.artistId).toBe(artist.id);
       expect(token.tokenHash).toContain('hash-');
     } finally {
       await prisma.bookingToken.deleteMany({
@@ -90,7 +96,7 @@ describe('persistence foundation', () => {
       await prisma.bookingRequest.deleteMany({
         where: { artistId: artist.id },
       });
-      await prisma.client.deleteMany({ where: { name: 'Cliente de prueba' } });
+      await prisma.client.deleteMany({ where: { artistId: artist.id } });
       await prisma.weeklyAvailability.deleteMany({
         where: { artistId: artist.id },
       });
@@ -111,7 +117,7 @@ describe('persistence foundation', () => {
       },
     });
     const client = await prisma.client.create({
-      data: { name: 'Exclusion Client' },
+      data: { artistId: artist.id, name: 'Exclusion Client' },
     });
 
     try {

@@ -65,6 +65,7 @@ model Artist {
   studioSettings      StudioSettings?
   weeklyAvailability  WeeklyAvailability[]
   availabilityBlocks  AvailabilityBlock[]
+  clients             Client[]
   bookingRequests     BookingRequest[]
   appointments        Appointment[]
   calendarConnection  CalendarConnection?
@@ -113,12 +114,15 @@ model AvailabilityBlock {
 
 model Client {
   id              String           @id @default(uuid()) @db.Uuid
+  artistId        String           @map("artist_id") @db.Uuid
   name            String           @db.VarChar(120)
   email           String?          @db.VarChar(320)
   phone           String?          @db.VarChar(32)
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  artist          Artist           @relation(fields: [artistId], references: [id], onDelete: Restrict)
   bookingRequests BookingRequest[]
 
+  @@index([artistId, createdAt])
   @@map("clients")
 }
 
