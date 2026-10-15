@@ -45,6 +45,45 @@ npm run start:dev
 
 Health endpoint: http://localhost:3000/v1/health
 
+## Google Calendar local
+
+La integración usa el flujo OAuth del backend. Flutter no recibe el client secret ni el refresh token.
+
+En Google Cloud deben estar habilitados Google Calendar API, OAuth consent screen, un usuario de prueba cuando la audiencia sea `External`, un cliente OAuth de tipo Web y este redirect URI exacto:
+
+```text
+http://localhost:3000/v1/admin/calendar/callback
+```
+
+En `api/.env` deben existir los valores reales, sin subirlos a Git:
+
+```env
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:3000/v1/admin/calendar/callback
+GOOGLE_CALENDAR_NAME=InkSlot
+GOOGLE_CALENDAR_SCOPES=https://www.googleapis.com/auth/calendar.freebusy,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/calendar.calendarlist.readonly
+GOOGLE_TOKEN_ENCRYPTION_KEY=
+CALENDAR_TIMEZONE=America/Guayaquil
+```
+
+La clave `GOOGLE_TOKEN_ENCRYPTION_KEY` debe decodificar a 32 bytes. Para generarla localmente:
+
+```bash
+openssl rand -base64 32
+```
+
+### Verificar la conexión
+
+1. Inicia el API con `npm run start:dev`.
+2. Inicia sesión con el administrador local y conserva la cookie `inkslot_session`.
+3. Llama `GET /v1/admin/calendar/connect` usando esa cookie.
+4. Abre `authorizationUrl` en el mismo navegador y autoriza el usuario de prueba.
+5. El callback devuelve JSON seguro; no devuelve tokens.
+6. Comprueba `GET /v1/admin/calendar/status` con la cookie administrativa.
+
+La conexión se activa solamente si Google devuelve exactamente un calendario cuyo nombre sea `InkSlot`. Si falta o hay más de uno, la API devuelve `CALENDAR_SELECTION_REQUIRED`. `freeBusy`, creación de eventos y outbox todavía pertenecen a las siguientes rebanadas SDD.
+
 ## Flutter Web
 
 ```bash

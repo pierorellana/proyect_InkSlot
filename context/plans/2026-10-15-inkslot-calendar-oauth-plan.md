@@ -358,9 +358,10 @@ Expected: build and tests pass; lint has no errors; existing unsafe-argument war
 Run:
 
     git status --short
-    git grep -n -I -E 'GOCSPX-|client_secret|refreshToken|GOOGLE_CLIENT_SECRET=' -- ':!api/.env' ':!api/.env.example'
+    git grep -n -I -E 'GOCSPX-[A-Za-z0-9_-]+' -- ':!context/plans' ':!api/.env' ':!api/.env.example'
+    git ls-files --error-unmatch api/.env
 
-Expected: no real secret values and no generated credentials outside ignored local files. Do not print `api/.env`.
+Expected: the secret grep returns no match and `git ls-files` reports that `api/.env` is not tracked. Do not print `api/.env`.
 
 - [ ] **Step 4: Record progress and commit**
 

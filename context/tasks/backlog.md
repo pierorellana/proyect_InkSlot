@@ -37,4 +37,5 @@ Para cada T: spec citada, tests unit/widget/integration pertinentes, errores/loa
 - `T-006`: login/me/logout local con Argon2id, cookie HttpOnly, sesión hash y throttling base implementados; guards de rutas admin y CSRF de despliegue quedan pendientes.
 - `T-008`: motor puro timezone-aware implementado con jornada, duración, paso, pausas, restricciones, bloqueos, ocupaciones, buffer, aviso, horizonte y fallo cerrado de Calendar; endpoint y repositorio quedan pendientes.
 - `T-007`: configuración admin de zona, paso, buffer, aviso, horizonte, jornadas y CRUD de bloqueos implementada con guard y transacciones; Agenda visual queda pendiente.
+- `T-009`: conexión OAuth local de Google Calendar implementada con estado anti-CSRF de un solo uso, refresh token cifrado, selección única del calendario `InkSlot`, status, connect, callback, disconnect y reconnect; `freeBusy`, eventos, outbox, retries e incidencias quedan pendientes.
 - `T-012`: aún pendiente; la ruta de fechas actual es un placeholder hasta implementar disponibilidad y selección de horarios.
