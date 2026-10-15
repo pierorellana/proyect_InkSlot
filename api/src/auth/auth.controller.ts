@@ -12,11 +12,10 @@ import type { Request, Response } from 'express';
 import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_TTL_SECONDS,
+  readAdminSessionToken,
 } from './auth.constants';
 import { LoginDto } from './auth.dto';
 import { AuthService } from './auth.service';
-
-type RequestWithCookies = Request;
 
 @Controller('auth')
 export class AuthController {
@@ -38,19 +37,19 @@ export class AuthController {
   }
 
   @Get('me')
-  async me(@Req() request: RequestWithCookies) {
+  async me(@Req() request: Request) {
     return {
-      user: await this.authService.me(this.readSessionToken(request)),
+      user: await this.authService.me(readAdminSessionToken(request)),
     };
   }
 
   @Post('logout')
   @HttpCode(204)
   async logout(
-    @Req() request: RequestWithCookies,
+    @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ): Promise<void> {
-    await this.authService.logout(this.readSessionToken(request));
+    await this.authService.logout(readAdminSessionToken(request));
     response.clearCookie(ADMIN_SESSION_COOKIE, {
       httpOnly: true,
       path: '/',
@@ -67,17 +66,5 @@ export class AuthController {
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',
     });
-  }
-
-  private readSessionToken(request: RequestWithCookies): string | undefined {
-    const cookieHeader = request.headers.cookie;
-    if (!cookieHeader) return undefined;
-
-    const cookie = cookieHeader
-      .split(';')
-      .map((entry) => entry.trim())
-      .find((entry) => entry.startsWith(`${ADMIN_SESSION_COOKIE}=`));
-
-    return cookie?.slice(ADMIN_SESSION_COOKIE.length + 1);
   }
 }
