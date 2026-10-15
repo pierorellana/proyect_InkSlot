@@ -13,7 +13,7 @@ El producto conservará la fidelidad visual del prototipo entregado: composició
 ## Restricciones aprobadas
 
 - El workspace tendrá únicamente tres carpetas principales: `app/`, `api/` y `context/`.
-- Frontend: Flutter Web + Provider + GoRouter.
+- Frontend: Flutter Web 3.47.5, managed with FVM, + Provider + GoRouter.
 - Backend: NestJS + TypeScript estricto.
 - Persistencia: PostgreSQL local, sin Docker ni Docker Compose.
 - ORM: Prisma, con migraciones SQL explícitas para capacidades de PostgreSQL no expresadas de forma segura en el modelo ORM.

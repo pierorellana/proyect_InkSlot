@@ -6,12 +6,13 @@
 
 **Architecture:** app/ contains a minimal Provider/GoRouter Flutter shell. api/ contains a versioned NestJS REST shell with global validation and an injectable Prisma client. PostgreSQL runs as a locally installed service; no Docker or Compose files are created.
 
-**Tech Stack:** Flutter Web, Dart, Provider, GoRouter, package:http, flutter_svg, intl, NestJS, TypeScript strict mode, Prisma, PostgreSQL, Jest, Supertest.
+**Tech Stack:** Flutter Web 3.47.5 managed with FVM, Dart 3.13.4, Provider, GoRouter, package:http, flutter_svg, intl, NestJS, TypeScript strict mode, Prisma, PostgreSQL, Jest, Supertest.
 
 ## Global Constraints
 
 - The workspace root contains only app/, api/, and context/ as project directories.
 - Frontend is Flutter Web + Provider; do not add Riverpod or Bloc.
+- Flutter is pinned to 3.47.5 through FVM; use `fvm flutter` and `fvm dart` for project commands.
 - Backend is NestJS + TypeScript; do not add a second server framework.
 - PostgreSQL is local; do not create Dockerfiles, Compose files, or container scripts.
 - Prisma is the ORM; future PostgreSQL-specific constraints are written in SQL migrations.
@@ -44,8 +45,9 @@ The bootstrap is complete when a developer can start native PostgreSQL, run the 
 
 ## Required local tools
 
-- Flutter SDK with Web/Chrome support.
-- Dart SDK supplied by Flutter.
+- FVM 2.4.1 or compatible.
+- Flutter SDK 3.47.5 with Web/Chrome support, selected through FVM.
+- Dart SDK 3.13.4 supplied by Flutter 3.47.5.
 - Node.js and npm.
 - PostgreSQL server and psql client.
 
@@ -89,9 +91,10 @@ Health endpoint: http://localhost:3000/v1/health
 
 ~~~bash
 cd app
-flutter pub get
-flutter test
-flutter run -d chrome --web-port 8080
+fvm use 3.47.5
+fvm flutter pub get
+fvm flutter test
+fvm flutter run -d chrome --web-port 8080
 ~~~
 
 Shell URL: http://localhost:8080
@@ -144,9 +147,10 @@ git commit -m "docs(context): define local development contract"
 - [ ] Step 1: Generate Web only and add packages.
 
 ~~~bash
-flutter create --platforms=web --project-name inkslot_app app
+fvm use 3.47.5
+fvm flutter create --platforms=web --project-name inkslot_app app
 cd app
-flutter pub add provider go_router http flutter_svg intl
+fvm flutter pub add provider go_router http flutter_svg intl
 rm test/widget_test.dart
 ~~~
 
@@ -167,7 +171,7 @@ void main() {
 }
 ~~~
 
-Run: flutter test test/smoke_test.dart
+Run: fvm flutter test test/smoke_test.dart
 
 Expected: FAIL because InkSlotApp is not defined.
 
@@ -289,8 +293,8 @@ void main() => runApp(const InkSlotApp());
 - [ ] Step 6: Format, test, and commit.
 
 ~~~bash
-dart format lib test
-flutter test test/smoke_test.dart
+fvm dart format lib test
+fvm flutter test test/smoke_test.dart
 git add app
 git commit -m "feat(app): add Flutter Web shell with Provider-ready routing"
 ~~~
@@ -614,10 +618,10 @@ Expected project roots: ., .git, app, api, context. No Docker or Compose artifac
 
 ~~~bash
 cd app
-dart format --output=none --set-exit-if-changed lib test
-flutter analyze
-flutter test
-flutter build web
+fvm dart format --output=none --set-exit-if-changed lib test
+fvm flutter analyze
+fvm flutter test
+fvm flutter build web
 ~~~
 
 Expected: all commands pass; app/build/web/ remains ignored.

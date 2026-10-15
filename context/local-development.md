@@ -2,8 +2,9 @@
 
 ## Required local tools
 
-- Flutter SDK with Web/Chrome support.
-- Dart SDK supplied by Flutter.
+- FVM 2.4.1 or compatible, with Flutter 3.47.5 selected for this project.
+- Flutter SDK 3.47.5 with Web/Chrome support, managed through FVM.
+- Dart SDK 3.13.4 supplied by Flutter 3.47.5.
 - Node.js and npm.
 - PostgreSQL server and `psql` client.
 
@@ -47,9 +48,10 @@ Health endpoint: http://localhost:3000/v1/health
 
 ```bash
 cd app
-flutter pub get
-flutter test
-flutter run -d chrome --web-port 8080
+fvm use 3.47.5
+fvm flutter pub get
+fvm flutter test
+fvm flutter run -d chrome --web-port 8080
 ```
 
 Shell URL: http://localhost:8080
