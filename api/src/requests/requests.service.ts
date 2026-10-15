@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  GoneException,
   HttpException,
   Injectable,
   NotFoundException,
@@ -19,6 +20,7 @@ import {
   decodeBookingCursor,
   encodeBookingCursor,
   generateBookingToken,
+  hashBookingToken,
 } from './booking-token';
 import type {
   BookingRequestStatusFilter,
@@ -33,6 +35,21 @@ type BookingRequestWithClient = Prisma.BookingRequestGetPayload<{
 
 type BookingRequestWithTokens = Prisma.BookingRequestGetPayload<{
   include: { client: true; tokens: true };
+}>;
+
+type PublicTokenRecord = Prisma.BookingTokenGetPayload<{
+  include: {
+    request: {
+      include: {
+        artist: {
+          select: {
+            displayName: true;
+            studioSettings: { select: { timezone: true } };
+          };
+        };
+      };
+    };
+  };
 }>;
 
 type Transaction = Prisma.TransactionClient;
@@ -67,6 +84,20 @@ export type BookingRequestLink = {
   expiresAt: string;
 };
 
+export type PublicReservationResponse = {
+  status: 'pending' | 'booked';
+  artist: { displayName: string };
+  durationMinutes: number;
+  timezone: string;
+  restrictions: {
+    minDate: string | null;
+    maxDate: string | null;
+    allowedWeekdays: number[] | null;
+    allowedWindows: Array<{ startLocal: string; endLocal: string }> | null;
+  };
+  expiresAt: string;
+};
+
 const safeError = (code: string, message: string) => ({
   error: { code, message },
 });
@@ -76,6 +107,19 @@ const badRequest = (code: string, message: string): BadRequestException =>
 
 const notFound = (): NotFoundException =>
   new NotFoundException(safeError('NOT_FOUND', 'La solicitud no existe'));
+
+const tokenNotFound = (): NotFoundException =>
+  new NotFoundException(
+    safeError('TOKEN_NOT_FOUND', 'El enlace de reserva no existe'),
+  );
+
+const tokenExpired = (): GoneException =>
+  new GoneException(safeError('TOKEN_EXPIRED', 'El enlace de reserva expiró'));
+
+const tokenRevoked = (): GoneException =>
+  new GoneException(
+    safeError('TOKEN_REVOKED', 'El enlace de reserva ya no está disponible'),
+  );
 
 const serviceUnavailable = (): ServiceUnavailableException =>
   new ServiceUnavailableException(
@@ -313,6 +357,125 @@ export class BookingRequestsService {
 
   async close(artistId: string, id: string): Promise<BookingRequestResponse> {
     return this.transition(artistId, id, BookingRequestStatus.CLOSED, 'closed');
+  }
+
+  async resolvePublic(token: string): Promise<PublicReservationResponse> {
+    let record: PublicTokenRecord | null;
+    try {
+      record = await this.prisma.bookingToken.findUnique({
+        where: { tokenHash: hashBookingToken(token) },
+        include: {
+          request: {
+            include: {
+              artist: {
+                select: {
+                  displayName: true,
+                  studioSettings: { select: { timezone: true } },
+                },
+              },
+            },
+          },
+        },
+      });
+    } catch {
+      throw serviceUnavailable();
+    }
+
+    if (!record) throw tokenNotFound();
+
+    const request = record.request;
+    if (
+      record.revokedAt !== null ||
+      request.status === BookingRequestStatus.CANCELLED ||
+      request.status === BookingRequestStatus.CLOSED
+    ) {
+      throw tokenRevoked();
+    }
+
+    const timezone = request.artist.studioSettings?.timezone;
+    if (!timezone) throw serviceUnavailable();
+
+    // A booked request remains safely readable even after its token has been
+    // consumed or its original TTL has elapsed. The request state is the
+    // source of truth for this already-reserved outcome.
+    if (request.status === BookingRequestStatus.BOOKED) {
+      return this.toPublicResponse(request, timezone, record.expiresAt, 'booked');
+    }
+
+    if (record.consumedAt !== null) {
+      throw tokenRevoked();
+    }
+
+    const now = new Date();
+    if (
+      request.status === BookingRequestStatus.EXPIRED ||
+      record.expiresAt.getTime() <= now.getTime()
+    ) {
+      if (
+        request.status === BookingRequestStatus.PENDING &&
+        record.expiresAt.getTime() <= now.getTime()
+      ) {
+        await this.expirePublicRequestIfNeeded(request.id, now);
+      }
+      throw tokenExpired();
+    }
+
+    return this.toPublicResponse(request, timezone, record.expiresAt, 'pending');
+  }
+
+  private toPublicResponse(
+    request: PublicTokenRecord['request'],
+    timezone: string,
+    expiresAt: Date,
+    status: 'pending' | 'booked',
+  ): PublicReservationResponse {
+    return {
+      status,
+      artist: { displayName: request.artist.displayName },
+      durationMinutes: request.durationMinutes,
+      timezone,
+      restrictions: {
+        minDate: request.minDate?.toISOString().slice(0, 10) ?? null,
+        maxDate: request.maxDate?.toISOString().slice(0, 10) ?? null,
+        allowedWeekdays: this.jsonArray(request.allowedWeekdays),
+        allowedWindows: this.jsonWindows(request.allowedWindows),
+      },
+      expiresAt: expiresAt.toISOString(),
+    };
+  }
+
+  private async expirePublicRequestIfNeeded(
+    requestId: string,
+    now: Date,
+  ): Promise<void> {
+    try {
+      await this.prisma.$transaction(
+        async (transaction) => {
+          const activeReplacement = await transaction.bookingToken.findFirst({
+            where: {
+              requestId,
+              revokedAt: null,
+              consumedAt: null,
+              expiresAt: { gt: now },
+            },
+            select: { id: true },
+          });
+
+          if (!activeReplacement) {
+            await transaction.bookingRequest.updateMany({
+              where: { id: requestId, status: BookingRequestStatus.PENDING },
+              data: {
+                status: BookingRequestStatus.EXPIRED,
+                version: { increment: 1 },
+              },
+            });
+          }
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch {
+      throw serviceUnavailable();
+    }
   }
 
   private async transition(
