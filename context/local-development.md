@@ -28,9 +28,10 @@ Create the database once:
 
 ```bash
 createdb -O inkslot inkslot_dev
+createdb -O inkslot inkslot_shadow
 ```
 
-If the database already exists, keep it. The application connection string lives in `api/.env` and is never committed.
+If either database already exists, keep it. `inkslot_shadow` is used only by Prisma's local migration checks; the application role does not receive persistent `CREATEDB` privileges. The application connection strings live in `api/.env` and are never committed.
 
 ## API
 

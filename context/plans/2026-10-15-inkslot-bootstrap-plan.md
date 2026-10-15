@@ -71,9 +71,10 @@ Create the database once:
 
 ~~~bash
 createdb -O inkslot inkslot_dev
+createdb -O inkslot inkslot_shadow
 ~~~
 
-If the database already exists, keep it. The application connection string lives in api/.env and is never committed.
+If either database already exists, keep it. `inkslot_shadow` is used only by Prisma's local migration checks; the application role does not receive persistent `CREATEDB` privileges. The application connection strings live in api/.env and are never committed.
 
 ## API
 
@@ -463,6 +464,7 @@ Expected: build and one e2e test pass.
 NODE_ENV=development
 PORT=3000
 DATABASE_URL="postgresql://inkslot:inkslot@127.0.0.1:5432/inkslot_dev?schema=public"
+SHADOW_DATABASE_URL="postgresql://inkslot:inkslot@127.0.0.1:5432/inkslot_shadow?schema=public"
 ~~~
 
 Run: cp api/.env.example api/.env
@@ -475,8 +477,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
 model Artist {
