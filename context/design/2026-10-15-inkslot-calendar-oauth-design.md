@@ -26,7 +26,7 @@ El calendario seleccionado para el entorno local será el calendario dedicado `I
 
 - `GET /v1/admin/calendar/status`: devuelve `disconnected`, `connected`, `error` o `needs_reconnect`, además del nombre seguro del calendario y timestamps.
 - `GET /v1/admin/calendar/connect`: requiere sesión admin, crea el estado OAuth de un solo uso y devuelve la URL de autorización.
-- `GET /v1/admin/calendar/callback`: valida `state`, intercambia el código, selecciona `InkSlot`, cifra el refresh token y redirige a una página local segura de resultado.
+- `GET /v1/admin/calendar/callback`: valida `state`, intercambia el código, selecciona `InkSlot`, cifra el refresh token y devuelve un JSON seguro de resultado para la verificación local. La pantalla Flutter podrá envolver este flujo después sin modificar el intercambio OAuth.
 - `POST /v1/admin/calendar/disconnect`: revoca la conexión local y elimina el token cifrado; no modifica citas internas.
 - `POST /v1/admin/calendar/reconnect`: inicia un nuevo flujo OAuth conservando las citas internas.
 
