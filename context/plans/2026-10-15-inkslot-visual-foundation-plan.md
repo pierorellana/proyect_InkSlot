@@ -48,7 +48,7 @@
 - Produces asset paths used by the logo and flash mosaic widgets.
 - Consumes only the supplied ZIP assets and `design-system-and-motion.md`.
 
-- [ ] **Step 1: Copy only the approved assets from the ZIP.**
+- [x] **Step 1: Copy only the approved assets from the ZIP.**
 
 Run from the workspace root:
 
@@ -65,7 +65,7 @@ for asset in flash-corazon flash-daga flash-luna flash-ojo flash-polilla flash-r
 
 Expected: only the five font files, four logo files, and six illustration files are added under `app/assets`.
 
-- [ ] **Step 2: Register the assets and fonts in `app/pubspec.yaml`.**
+- [x] **Step 2: Register the assets and fonts in `app/pubspec.yaml`.**
 
 The Flutter section must contain:
 
@@ -90,11 +90,11 @@ The Flutter section must contain:
           style: italic
 ```
 
-- [ ] **Step 3: Encode the exact token set in `inkslot_tokens.dart`.**
+- [x] **Step 3: Encode the exact token set in `inkslot_tokens.dart`.**
 
 Define immutable constants for `#050505`, `#0A0A0B`, `#131315`, `#1C1C1F`, `#EEE9E0`, `#F2ECE2`, `#A7A29A`, `#9B968E`, `#C87939`, `#D48A45`, `#241A12`, and semantic green/yellow/coral. Define radii 28/24/38/26/20, spacing 20/24, and durations 200/550/600/4600 milliseconds.
 
-- [ ] **Step 4: Run asset and token checks.**
+- [x] **Step 4: Run asset and token checks.**
 
 Run:
 
@@ -107,7 +107,7 @@ fvm flutter test
 
 Expected: all existing tests pass and no asset declaration errors occur.
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add app/assets app/pubspec.yaml app/pubspec.lock app/lib/core/theme/inkslot_tokens.dart
@@ -132,19 +132,19 @@ git commit -m "feat(app): add InkSlot visual assets and tokens"
 - `InkSlotPrimaryButton({required String label, required VoidCallback? onPressed, Widget? trailing, Key? key})` renders a 44 px minimum copper CTA.
 - `InkSlotPage({required Widget child, EdgeInsetsGeometry padding = const EdgeInsets.fromLTRB(20, 24, 20, 34), Key? key})` provides the dark responsive page surface.
 
-- [ ] **Step 1: Write widget tests for typography, semantics, and target size.**
+- [x] **Step 1: Write widget tests for typography, semantics, and target size.**
 
 Test that the logo has a non-empty semantic label, the mono label uppercases its text, and the primary button has at least 44 px height and invokes its callback.
 
-- [ ] **Step 2: Implement the theme.**
+- [x] **Step 2: Implement the theme.**
 
 Use `ThemeData.dark` with `fontFamily: 'Geist'`, `headline` styles in `Instrument Serif`, mono labels in `Geist Mono`, surface `#131315`, background `#050505`, copper primary, 28 px button radius, and no default splash color that conflicts with the copper treatment.
 
-- [ ] **Step 3: Implement the primitives with `flutter_svg`.**
+- [x] **Step 3: Implement the primitives with `flutter_svg`.**
 
 Use `SvgPicture.asset` for the D logo and exact local asset paths. Keep the button's visual state in Flutter's `MaterialStateProperty`; use a copper glow only for enabled/pressed states.
 
-- [ ] **Step 4: Run the focused tests and analyze.**
+- [x] **Step 4: Run the focused tests and analyze.**
 
 ```bash
 cd app
@@ -153,7 +153,7 @@ fvm flutter analyze
 fvm flutter test test/core/visual_primitives_test.dart
 ```
 
-- [ ] **Step 5: Commit.**
+- [x] **Step 5: Commit.**
 
 ```bash
 git add app/lib/core app/test/core
@@ -180,23 +180,23 @@ git commit -m "feat(app): add InkSlot theme primitives"
 - `PublicWelcomePage({required String token, required VoidCallback onChooseDate, Key? key})` presents the private-link welcome state without calling the API.
 - `/` shows splash then welcome; `/r/:token` opens welcome directly with its opaque token kept in route state only.
 
-- [ ] **Step 1: Write route and entry widget tests.**
+- [x] **Step 1: Write route and entry widget tests.**
 
 Cover root rendering, skip action, deep link `/r/demo-token` bypassing splash, and the primary welcome CTA navigating to `/r/demo-token/dates` placeholder route. Test with `MediaQuery.disableAnimations` so tests do not wait 4.6 s.
 
-- [ ] **Step 2: Implement the splash.**
+- [x] **Step 2: Implement the splash.**
 
 Use `AnimationController` with the approved `coinIn`, `sway`, `draw`, `drop`, `ripple`, `halo`, and `wm` sequence. Reuse the D SVG and render the copper glow using layered `DecoratedBox`/`CustomPaint`; do not use the screenshot as a background. Show `SALTAR INTRO` as a 44 px minimum target. If animations are disabled, call `onFinished` immediately after the first frame.
 
-- [ ] **Step 3: Implement the welcome.**
+- [x] **Step 3: Implement the welcome.**
 
 Recreate the six-card flash mosaic with alternating vertical movement, the private-link chip, mono copper status, Instrument Serif headline, summary card, artist row, copper CTA, and help link from the reference capture. Keep the sample display values clearly presentation-only and make the CTA route-only until the availability slice exists.
 
-- [ ] **Step 4: Add responsive constraints and navigation.**
+- [x] **Step 4: Add responsive constraints and navigation.**
 
 Use `LayoutBuilder` with a 390 px content baseline, clamp horizontal padding between 20 and 24 px, preserve scrollability on short screens, and provide `/r/:token/dates` as a route placeholder that does not claim availability exists.
 
-- [ ] **Step 5: Run focused and complete frontend checks.**
+- [x] **Step 5: Run focused and complete frontend checks.**
 
 ```bash
 cd app
@@ -208,7 +208,7 @@ fvm flutter build web
 
 Expected: all tests pass, the build contains local font/SVG assets, and no screenshot asset is referenced by Dart code.
 
-- [ ] **Step 6: Commit.**
+- [x] **Step 6: Commit.**
 
 ```bash
 git add app/lib app/test app/pubspec.yaml app/pubspec.lock
@@ -235,7 +235,7 @@ fvm flutter run -d chrome --web-port 8080
 
 Inspect at 390×844 and a desktop width. Compare splash and welcome against `01-cliente-splash.jpg` and `02-cliente-bienvenida.jpg` from the ignored prototype ZIP.
 
-- [ ] **Step 2: Record evidence.**
+- [x] **Step 2: Record evidence.**
 
 Document typography, colors, logo, card composition, CTA, responsive behavior, reduced motion, and any intentional gap. Do not add screenshots to Git.
 

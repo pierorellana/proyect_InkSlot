@@ -27,3 +27,10 @@ Formato `ID | Entregable | Spec | Verificación`.
 
 ## Definition of Done
 Para cada T: spec citada, tests unit/widget/integration pertinentes, errores/loading/empty, secretos fuera del repo, logs con requestId sin PII innecesaria, actualización OpenAPI/ADR si aplica, evidencia visual y commit enfocado. P1 no se implementa antes de estabilizar P0.
+
+## Avance documentado — 2026-10-15
+
+- `T-002`: base Flutter Web 3.47.5 con FVM, Provider, GoRouter, tema y primitivas visuales implementada.
+- `T-003`: logo, ilustraciones y tipografías locales importados desde el ZIP aprobado.
+- `T-004`: splash y bienvenida públicos implementados con animación 3D, skip intro y reduced motion.
+- `T-012`: aún pendiente; la ruta de fechas actual es un placeholder hasta implementar disponibilidad y selección de horarios.
