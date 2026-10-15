@@ -1,0 +1,2 @@
+export const CALENDAR_PROVIDER = Symbol('CALENDAR_PROVIDER');
+export const CALENDAR_OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
