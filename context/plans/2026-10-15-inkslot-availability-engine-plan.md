@@ -8,7 +8,7 @@
 
 ## Contrato
 
-- Entrada: zona IANA del estudio, fechas locales inclusivas, jornada semanal, duración, paso, aviso, horizonte, buffer, restricciones de solicitud, bloqueos internos, ocupaciones externas y un indicador de Calendar verificable.
+- Entrada: zona IANA del estudio, fechas locales inclusivas, jornada semanal, duración, paso, aviso, horizonte, buffer, restricciones de solicitud, bloqueos internos, citas internas, ocupaciones externas y un indicador de Calendar verificable.
 - Salida: `timezone` y días que tengan al menos un slot `{startAt,endAt}` expresado en ISO UTC.
 - La semana usa `0=domingo ... 6=sábado`, alineada con los valores de demo del prototipo.
 - Los intervalos son semiabiertos `[start,end)`; la duración debe caber completamente en la ventana.
