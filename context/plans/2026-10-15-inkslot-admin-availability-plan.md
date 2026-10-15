@@ -28,8 +28,8 @@
 
 ## Pasos
 
-1. Escribir pruebas e2e de guard, validación y round-trip PUT/GET.
-2. Implementar extracción de cookie y `AdminSessionGuard` reutilizable.
-3. Implementar DTO, servicio transaccional y controller de disponibilidad.
-4. Ejecutar formato, build, unit/e2e y lint.
+1. [x] Escribir pruebas e2e de guard, validación y round-trip PUT/GET.
+2. [x] Implementar extracción de cookie y `AdminSessionGuard` reutilizable.
+3. [x] Implementar DTO, servicio transaccional y controller de disponibilidad.
+4. [x] Ejecutar formato, build, unit/e2e y lint.
 5. Registrar avance; el motor público y bloques serán slices posteriores.
