@@ -25,7 +25,7 @@
 
 ## Pasos
 
-1. Añadir tests e2e de POST/GET/DELETE y rangos inválidos.
-2. Implementar DTO, service y controller bajo `/admin/blocks`.
-3. Ejecutar format, build, unit/e2e y lint.
+1. [x] Añadir tests e2e de POST/GET/DELETE y rangos inválidos.
+2. [x] Implementar DTO, service y controller bajo `/admin/blocks`.
+3. [x] Ejecutar format, build, unit/e2e y lint.
 4. Registrar avance; el endpoint público seguirá dependiendo de tokens y Calendar verificable.
