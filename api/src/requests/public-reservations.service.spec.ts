@@ -1,4 +1,4 @@
-import { GoneException, HttpException } from '@nestjs/common';
+import { HttpException } from '@nestjs/common';
 import { BookingRequestStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../database/prisma.service';
@@ -50,7 +50,12 @@ describe('BookingRequestsService public resolution', () => {
     bookingRequest,
     $transaction: jest.fn<
       Promise<unknown>,
-      [(operation: (tx: Prisma.TransactionClient) => Promise<unknown>) => Promise<unknown>, object]
+      [
+        (
+          operation: (tx: Prisma.TransactionClient) => Promise<unknown>,
+        ) => Promise<unknown>,
+        object,
+      ]
     >(),
   };
   let service: BookingRequestsService;
@@ -107,22 +112,32 @@ describe('BookingRequestsService public resolution', () => {
   ) {
     const error: unknown = await operation.catch((failure: unknown) => failure);
     expect(error).toBeInstanceOf(HttpException);
-    if (!(error instanceof HttpException)) throw new Error('Expected safe HTTP error');
+    if (!(error instanceof HttpException))
+      throw new Error('Expected safe HTTP error');
     expect(error.getStatus()).toBe(status);
-    expect(error.getResponse()).toEqual({
-      error: { code, message: expect.any(String) },
-    });
-    expect(JSON.stringify(error.getResponse())).not.toContain(rawToken);
-    expect(JSON.stringify(error.getResponse())).not.toContain(tokenHash);
+    const response = error.getResponse();
+    if (
+      typeof response !== 'object' ||
+      response === null ||
+      !('error' in response)
+    ) {
+      throw new Error('Expected safe error envelope');
+    }
+    const envelope = response as {
+      error: { code?: unknown; message?: unknown };
+    };
+    expect(envelope.error.code).toBe(code);
+    expect(typeof envelope.error.message).toBe('string');
+    expect(JSON.stringify(response)).not.toContain(rawToken);
+    expect(JSON.stringify(response)).not.toContain(tokenHash);
   }
 
   it('looks up by SHA-256 hash and returns only the approved pending summary', async () => {
     const result = await service.resolvePublic(rawToken);
 
-    expect(bookingToken.findUnique).toHaveBeenCalledWith({
-      where: { tokenHash },
-      include: expect.objectContaining({ request: expect.any(Object) }),
-    });
+    const lookup = bookingToken.findUnique.mock.calls[0]?.[0];
+    expect(lookup?.where).toEqual({ tokenHash });
+    expect(lookup?.include).toBeDefined();
     expect(result).toEqual({
       status: 'pending',
       artist: { displayName: 'InkSlot Artist' },
@@ -210,18 +225,50 @@ describe('BookingRequestsService public resolution', () => {
     const expired = record();
     expired.expiresAt = new Date('2026-10-15T11:59:59.000Z');
     bookingToken.findUnique.mockResolvedValue(expired);
-    bookingToken.findFirst.mockResolvedValue({ id: '55555555-5555-4555-8555-555555555555' });
+    bookingToken.findFirst.mockResolvedValue({
+      id: '55555555-5555-4555-8555-555555555555',
+    });
 
     await expectCode(service.resolvePublic(rawToken), 'TOKEN_EXPIRED', 410);
     expect(bookingRequest.updateMany).not.toHaveBeenCalled();
   });
 
   it.each([
-    ['revoked token', (value: PublicTokenRecord) => { value.revokedAt = now; }, 'TOKEN_REVOKED'],
-    ['consumed token', (value: PublicTokenRecord) => { value.consumedAt = now; }, 'TOKEN_REVOKED'],
-    ['cancelled request', (value: PublicTokenRecord) => { value.request.status = BookingRequestStatus.CANCELLED; }, 'TOKEN_REVOKED'],
-    ['closed request', (value: PublicTokenRecord) => { value.request.status = BookingRequestStatus.CLOSED; }, 'TOKEN_REVOKED'],
-    ['expired request', (value: PublicTokenRecord) => { value.request.status = BookingRequestStatus.EXPIRED; }, 'TOKEN_EXPIRED'],
+    [
+      'revoked token',
+      (value: PublicTokenRecord) => {
+        value.revokedAt = now;
+      },
+      'TOKEN_REVOKED',
+    ],
+    [
+      'consumed token',
+      (value: PublicTokenRecord) => {
+        value.consumedAt = now;
+      },
+      'TOKEN_REVOKED',
+    ],
+    [
+      'cancelled request',
+      (value: PublicTokenRecord) => {
+        value.request.status = BookingRequestStatus.CANCELLED;
+      },
+      'TOKEN_REVOKED',
+    ],
+    [
+      'closed request',
+      (value: PublicTokenRecord) => {
+        value.request.status = BookingRequestStatus.CLOSED;
+      },
+      'TOKEN_REVOKED',
+    ],
+    [
+      'expired request',
+      (value: PublicTokenRecord) => {
+        value.request.status = BookingRequestStatus.EXPIRED;
+      },
+      'TOKEN_EXPIRED',
+    ],
   ])('rejects %s with the safe public error', async (_label, mutate, code) => {
     const value = record();
     mutate(value);
@@ -235,17 +282,29 @@ describe('BookingRequestsService public resolution', () => {
     value.request.artist.studioSettings = null;
     bookingToken.findUnique.mockResolvedValue(value);
 
-    await expectCode(service.resolvePublic(rawToken), 'SERVICE_UNAVAILABLE', 503);
+    await expectCode(
+      service.resolvePublic(rawToken),
+      'SERVICE_UNAVAILABLE',
+      503,
+    );
   });
 
   it('sanitizes lookup and expiration persistence failures', async () => {
     bookingToken.findUnique.mockRejectedValue(new Error(`private ${rawToken}`));
-    await expectCode(service.resolvePublic(rawToken), 'SERVICE_UNAVAILABLE', 503);
+    await expectCode(
+      service.resolvePublic(rawToken),
+      'SERVICE_UNAVAILABLE',
+      503,
+    );
 
     const expired = record();
     expired.expiresAt = new Date('2026-10-15T11:59:59.000Z');
     bookingToken.findUnique.mockResolvedValue(expired);
     prisma.$transaction.mockRejectedValue(new Error(`private ${tokenHash}`));
-    await expectCode(service.resolvePublic(rawToken), 'SERVICE_UNAVAILABLE', 503);
+    await expectCode(
+      service.resolvePublic(rawToken),
+      'SERVICE_UNAVAILABLE',
+      503,
+    );
   });
 });

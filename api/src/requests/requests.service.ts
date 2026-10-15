@@ -179,14 +179,19 @@ export class BookingRequestsService {
           status: BookingRequestStatus.PENDING,
           minDate: restrictions.minDate,
           maxDate: restrictions.maxDate,
-          allowedWeekdays: restrictions.allowedWeekdays as Prisma.InputJsonValue,
+          allowedWeekdays:
+            restrictions.allowedWeekdays as Prisma.InputJsonValue,
           allowedWindows: restrictions.allowedWindows as Prisma.InputJsonValue,
         },
         include: { client: true },
       });
 
       await transaction.bookingToken.create({
-        data: { requestId: request.id, tokenHash: generated.tokenHash, expiresAt },
+        data: {
+          requestId: request.id,
+          tokenHash: generated.tokenHash,
+          expiresAt,
+        },
       });
       await transaction.auditLog.create({
         data: {
@@ -200,7 +205,10 @@ export class BookingRequestsService {
 
       return {
         request: this.toResponse(request),
-        link: { path: `/r/${generated.token}`, expiresAt: expiresAt.toISOString() },
+        link: {
+          path: `/r/${generated.token}`,
+          expiresAt: expiresAt.toISOString(),
+        },
       };
     });
   }
@@ -243,7 +251,9 @@ export class BookingRequestsService {
         take: BOOKING_REQUEST_PAGE_SIZE + 1,
       });
       const hasNextPage = rows.length > BOOKING_REQUEST_PAGE_SIZE;
-      const page = hasNextPage ? rows.slice(0, BOOKING_REQUEST_PAGE_SIZE) : rows;
+      const page = hasNextPage
+        ? rows.slice(0, BOOKING_REQUEST_PAGE_SIZE)
+        : rows;
       const last = page.at(-1);
 
       return {
@@ -264,7 +274,10 @@ export class BookingRequestsService {
     id: string,
   ): Promise<{
     request: BookingRequestResponse;
-    currentLink: { status: 'active' | 'expired' | 'revoked' | 'consumed'; expiresAt: string } | null;
+    currentLink: {
+      status: 'active' | 'expired' | 'revoked' | 'consumed';
+      expiresAt: string;
+    } | null;
     audit: Array<{ action: string; createdAt: string }>;
   }> {
     try {
@@ -328,7 +341,10 @@ export class BookingRequestsService {
       });
       const updated = await transaction.bookingRequest.update({
         where: { id, artistId },
-        data: { status: BookingRequestStatus.PENDING, version: { increment: 1 } },
+        data: {
+          status: BookingRequestStatus.PENDING,
+          version: { increment: 1 },
+        },
         include: { client: true },
       });
       await transaction.bookingToken.create({
@@ -346,13 +362,21 @@ export class BookingRequestsService {
 
       return {
         request: this.toResponse(updated),
-        link: { path: `/r/${generated.token}`, expiresAt: expiresAt.toISOString() },
+        link: {
+          path: `/r/${generated.token}`,
+          expiresAt: expiresAt.toISOString(),
+        },
       };
     });
   }
 
   async revoke(artistId: string, id: string): Promise<BookingRequestResponse> {
-    return this.transition(artistId, id, BookingRequestStatus.CANCELLED, 'revoked');
+    return this.transition(
+      artistId,
+      id,
+      BookingRequestStatus.CANCELLED,
+      'revoked',
+    );
   }
 
   async close(artistId: string, id: string): Promise<BookingRequestResponse> {
@@ -399,7 +423,12 @@ export class BookingRequestsService {
     // consumed or its original TTL has elapsed. The request state is the
     // source of truth for this already-reserved outcome.
     if (request.status === BookingRequestStatus.BOOKED) {
-      return this.toPublicResponse(request, timezone, record.expiresAt, 'booked');
+      return this.toPublicResponse(
+        request,
+        timezone,
+        record.expiresAt,
+        'booked',
+      );
     }
 
     if (record.consumedAt !== null) {
@@ -420,7 +449,12 @@ export class BookingRequestsService {
       throw tokenExpired();
     }
 
-    return this.toPublicResponse(request, timezone, record.expiresAt, 'pending');
+    return this.toPublicResponse(
+      request,
+      timezone,
+      record.expiresAt,
+      'pending',
+    );
   }
 
   private toPublicResponse(
@@ -498,7 +532,10 @@ export class BookingRequestsService {
         request.status !== BookingRequestStatus.PENDING &&
         request.status !== BookingRequestStatus.EXPIRED
       ) {
-        throw badRequest('BAD_REQUEST', 'La solicitud no puede cambiar de estado');
+        throw badRequest(
+          'BAD_REQUEST',
+          'La solicitud no puede cambiar de estado',
+        );
       }
 
       await transaction.bookingToken.updateMany({
@@ -536,7 +573,9 @@ export class BookingRequestsService {
     return request;
   }
 
-  private async serializable<T>(operation: (transaction: Transaction) => Promise<T>): Promise<T> {
+  private async serializable<T>(
+    operation: (transaction: Transaction) => Promise<T>,
+  ): Promise<T> {
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         return await this.prisma.$transaction(operation, {
@@ -552,7 +591,10 @@ export class BookingRequestsService {
   }
 
   private isSerializationConflict(error: unknown): boolean {
-    return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+    return (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2034'
+    );
   }
 
   private rethrowHttp(error: unknown): void {
@@ -572,26 +614,40 @@ export class BookingRequestsService {
 
   private validateTtl(value: number | undefined): number {
     const ttl = value === undefined ? DEFAULT_BOOKING_TOKEN_TTL_HOURS : value;
-    if (!Number.isInteger(ttl) || ttl < 1 || ttl > MAX_BOOKING_TOKEN_TTL_HOURS) {
+    if (
+      !Number.isInteger(ttl) ||
+      ttl < 1 ||
+      ttl > MAX_BOOKING_TOKEN_TTL_HOURS
+    ) {
       throw badRequest('BAD_REQUEST', 'El TTL del enlace no es válido');
     }
     return ttl;
   }
 
-  private normalizeRestrictions(dto: CreateBookingRequestDto): NormalizedRestrictions {
+  private normalizeRestrictions(
+    dto: CreateBookingRequestDto,
+  ): NormalizedRestrictions {
     const minDate = dto.minDate ? this.parseDate(dto.minDate) : null;
     const maxDate = dto.maxDate ? this.parseDate(dto.maxDate) : null;
     if (minDate && maxDate && minDate.getTime() > maxDate.getTime()) {
-      throw badRequest('INVALID_RESTRICTIONS', 'El rango de fechas no es válido');
+      throw badRequest(
+        'INVALID_RESTRICTIONS',
+        'El rango de fechas no es válido',
+      );
     }
 
     const allowedWeekdays = dto.allowedWeekdays ?? null;
     if (
       allowedWeekdays &&
-      (allowedWeekdays.some((day) => !Number.isInteger(day) || day < 0 || day > 6) ||
+      (allowedWeekdays.some(
+        (day) => !Number.isInteger(day) || day < 0 || day > 6,
+      ) ||
         new Set(allowedWeekdays).size !== allowedWeekdays.length)
     ) {
-      throw badRequest('INVALID_RESTRICTIONS', 'Los días permitidos no son válidos');
+      throw badRequest(
+        'INVALID_RESTRICTIONS',
+        'Los días permitidos no son válidos',
+      );
     }
 
     const allowedWindows = dto.allowedWindows ?? null;
@@ -604,7 +660,10 @@ export class BookingRequestsService {
           window.startLocal >= window.endLocal,
       )
     ) {
-      throw badRequest('INVALID_RESTRICTIONS', 'Las franjas permitidas no son válidas');
+      throw badRequest(
+        'INVALID_RESTRICTIONS',
+        'Las franjas permitidas no son válidas',
+      );
     }
 
     return { minDate, maxDate, allowedWeekdays, allowedWindows };
@@ -630,7 +689,9 @@ export class BookingRequestsService {
     return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value);
   }
 
-  private statusFromFilter(status: BookingRequestStatusFilter | undefined): BookingRequestStatus | undefined {
+  private statusFromFilter(
+    status: BookingRequestStatusFilter | undefined,
+  ): BookingRequestStatus | undefined {
     if (!status) return undefined;
     const mapped: Record<BookingRequestStatusFilter, BookingRequestStatus> = {
       pending: BookingRequestStatus.PENDING,
@@ -652,7 +713,8 @@ export class BookingRequestsService {
         token.consumedAt === null &&
         token.expiresAt.getTime() > Date.now(),
     );
-    if (active) return { status: 'active', expiresAt: active.expiresAt.toISOString() };
+    if (active)
+      return { status: 'active', expiresAt: active.expiresAt.toISOString() };
 
     const token = [...request.tokens].sort(
       (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
@@ -692,9 +754,12 @@ export class BookingRequestsService {
   }
 
   private jsonArray(value: Prisma.JsonValue | null): number[] | null {
-    return Array.isArray(value) && value.every((entry) => typeof entry === 'number')
-      ? value as number[]
-      : null;
+    if (!Array.isArray(value)) return null;
+
+    const numbers = value.filter(
+      (entry): entry is number => typeof entry === 'number',
+    );
+    return numbers.length === value.length ? numbers : null;
   }
 
   private jsonWindows(
@@ -713,4 +778,3 @@ export class BookingRequestsService {
     return windows.length === value.length ? windows : null;
   }
 }
-

@@ -27,10 +27,7 @@ export class BookingRequestsController {
   constructor(private readonly service: BookingRequestsService) {}
 
   @Post()
-  create(
-    @Req() request: Request,
-    @Body() dto: CreateBookingRequestDto,
-  ) {
+  create(@Req() request: Request, @Body() dto: CreateBookingRequestDto) {
     return this.service.create(this.user(request).id, dto);
   }
 
@@ -67,4 +64,3 @@ export class BookingRequestsController {
     return (request as AuthenticatedRequest).user;
   }
 }
-

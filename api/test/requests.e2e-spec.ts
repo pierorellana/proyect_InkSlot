@@ -41,6 +41,11 @@ type HttpResponse = {
   status: number;
 };
 
+type LifecycleResponse = {
+  request?: { status?: string };
+  status?: string;
+};
+
 describe('booking request lifecycle', () => {
   let app: INestApplication;
   let prisma: PrismaService;
@@ -220,13 +225,10 @@ describe('booking request lifecycle', () => {
     });
 
     expect(response.request).toMatchObject({
-      client: {
-        name: expect.stringContaining('Inline Client'),
-        email: 'inline@example.test',
-        phone: '+593999999999',
-      },
+      client: { email: 'inline@example.test', phone: '+593999999999' },
       status: 'pending',
     });
+    expect(response.request.client.name.startsWith('Inline Client')).toBe(true);
     expect(response.link.path).toMatch(/^\/r\/[A-Za-z0-9_-]+$/);
     expect(persisted.tokenHash).toBe(hashBookingToken(token));
     expect(persisted.tokenHash).not.toBe(token);
@@ -328,10 +330,12 @@ describe('booking request lifecycle', () => {
       .post(`/v1/admin/booking-requests/${revoked.response.request.id}/revoke`)
       .set('Cookie', cookies)
       .expect(201);
-    expect(firstRevoke.body.request?.status ?? firstRevoke.body.status).toBe(
+    const firstRevokeBody = firstRevoke.body as LifecycleResponse;
+    const secondRevokeBody = secondRevoke.body as LifecycleResponse;
+    expect(firstRevokeBody.request?.status ?? firstRevokeBody.status).toBe(
       'cancelled',
     );
-    expect(secondRevoke.body.request?.status ?? secondRevoke.body.status).toBe(
+    expect(secondRevokeBody.request?.status ?? secondRevokeBody.status).toBe(
       'cancelled',
     );
 
@@ -350,10 +354,12 @@ describe('booking request lifecycle', () => {
       .post(`/v1/admin/booking-requests/${closed.response.request.id}/close`)
       .set('Cookie', cookies)
       .expect(201);
-    expect(firstClose.body.request?.status ?? firstClose.body.status).toBe(
+    const firstCloseBody = firstClose.body as LifecycleResponse;
+    const secondCloseBody = secondClose.body as LifecycleResponse;
+    expect(firstCloseBody.request?.status ?? firstCloseBody.status).toBe(
       'closed',
     );
-    expect(secondClose.body.request?.status ?? secondClose.body.status).toBe(
+    expect(secondCloseBody.request?.status ?? secondCloseBody.status).toBe(
       'closed',
     );
   });

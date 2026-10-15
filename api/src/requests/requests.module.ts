@@ -12,4 +12,3 @@ import { BookingRequestsService } from './requests.service';
   exports: [BookingRequestsService],
 })
 export class RequestsModule {}
-

@@ -123,4 +123,3 @@ export class ListBookingRequestsDto {
   @MaxLength(256)
   cursor?: string;
 }
-
