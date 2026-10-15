@@ -33,6 +33,7 @@ enum CalendarConnectionStatus {
   CONNECTED
   DISCONNECTED
   ERROR
+  NEEDS_RECONNECT
 }
 
 enum OutboxStatus {
@@ -54,20 +55,21 @@ enum ActorType {
 }
 
 model Artist {
-  id                 String               @id @default(uuid()) @db.Uuid
-  email              String               @unique @db.VarChar(320)
-  passwordHash       String               @map("password_hash") @db.VarChar(255)
-  displayName        String               @map("display_name") @db.VarChar(120)
-  active             Boolean              @default(true)
-  createdAt          DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
-  studioSettings     StudioSettings?
-  weeklyAvailability WeeklyAvailability[]
-  availabilityBlocks AvailabilityBlock[]
-  bookingRequests    BookingRequest[]
-  appointments       Appointment[]
-  calendarConnection CalendarConnection?
-  adminSessions      AdminSession[]
+  id                  String               @id @default(uuid()) @db.Uuid
+  email               String               @unique @db.VarChar(320)
+  passwordHash        String               @map("password_hash") @db.VarChar(255)
+  displayName         String               @map("display_name") @db.VarChar(120)
+  active              Boolean              @default(true)
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+  studioSettings      StudioSettings?
+  weeklyAvailability  WeeklyAvailability[]
+  availabilityBlocks  AvailabilityBlock[]
+  bookingRequests     BookingRequest[]
+  appointments        Appointment[]
+  calendarConnection  CalendarConnection?
+  calendarOauthStates CalendarOAuthState[]
+  adminSessions       AdminSession[]
 
   @@map("artists")
 }
@@ -180,6 +182,7 @@ model CalendarConnection {
   id                    String                   @id @default(uuid()) @db.Uuid
   artistId              String                   @unique @map("artist_id") @db.Uuid
   calendarId            String                   @map("calendar_id") @db.VarChar(320)
+  calendarName          String?                  @map("calendar_name") @db.VarChar(200)
   encryptedRefreshToken String                   @map("encrypted_refresh_token") @db.Text
   status                CalendarConnectionStatus @default(DISCONNECTED)
   connectedAt           DateTime?                @map("connected_at") @db.Timestamptz(6)
@@ -187,6 +190,19 @@ model CalendarConnection {
   artist                Artist                   @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   @@map("calendar_connections")
+}
+
+model CalendarOAuthState {
+  id         String    @id @default(uuid()) @db.Uuid
+  artistId   String    @map("artist_id") @db.Uuid
+  stateHash  String    @unique @map("state_hash") @db.VarChar(128)
+  expiresAt  DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  artist     Artist    @relation(fields: [artistId], references: [id], onDelete: Cascade)
+
+  @@index([artistId, expiresAt])
+  @@map("calendar_oauth_states")
 }
 
 model AdminSession {
