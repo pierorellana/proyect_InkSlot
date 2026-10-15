@@ -120,4 +120,56 @@ describe('admin availability configuration', () => {
       })
       .expect(400);
   });
+
+  it('creates, lists, and deletes scoped availability blocks', async () => {
+    const create = await request(app.getHttpServer())
+      .post('/v1/admin/blocks')
+      .set('Cookie', cookies)
+      .send({
+        startAt: '2026-10-23T15:00:00.000Z',
+        endAt: '2026-10-23T18:00:00.000Z',
+        reason: 'Bloqueo de prueba',
+      })
+      .expect(201);
+    const block = create.body as {
+      id: string;
+      startAt: string;
+      endAt: string;
+      reason: string;
+    };
+
+    expect(block).toMatchObject({
+      startAt: '2026-10-23T15:00:00.000Z',
+      endAt: '2026-10-23T18:00:00.000Z',
+      reason: 'Bloqueo de prueba',
+    });
+
+    await request(app.getHttpServer())
+      .get('/v1/admin/blocks')
+      .set('Cookie', cookies)
+      .expect(200)
+      .expect([block]);
+
+    await request(app.getHttpServer())
+      .delete(`/v1/admin/blocks/${block.id}`)
+      .set('Cookie', cookies)
+      .expect(204);
+
+    await request(app.getHttpServer())
+      .get('/v1/admin/blocks')
+      .set('Cookie', cookies)
+      .expect(200)
+      .expect([]);
+  });
+
+  it('rejects an inverted block interval', async () => {
+    await request(app.getHttpServer())
+      .post('/v1/admin/blocks')
+      .set('Cookie', cookies)
+      .send({
+        startAt: '2026-10-23T18:00:00.000Z',
+        endAt: '2026-10-23T15:00:00.000Z',
+      })
+      .expect(400);
+  });
 });
