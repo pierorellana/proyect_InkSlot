@@ -4,6 +4,8 @@ import { google, calendar_v3 } from 'googleapis';
 import type { CalendarConfig } from './calendar.config';
 import {
   CalendarProviderError,
+  type CalendarBusyInterval,
+  type CalendarBusyQuery,
   type CalendarProvider,
   type CalendarSummary,
   type CalendarTokens,
@@ -79,6 +81,66 @@ export class GoogleCalendarProvider implements CalendarProvider {
     }
   }
 
+  async freeBusy(input: CalendarBusyQuery): Promise<CalendarBusyInterval[]> {
+    try {
+      const client = this.createClient();
+      client.setCredentials({ refresh_token: input.refreshToken });
+      const calendar = google.calendar({ version: 'v3', auth: client });
+      const response = await calendar.freebusy.query({
+        requestBody: {
+          timeMin: input.timeMin.toISOString(),
+          timeMax: input.timeMax.toISOString(),
+          timeZone: input.timeZone,
+          items: [{ id: input.calendarId }],
+        },
+      });
+      const calendarData = response.data.calendars?.[input.calendarId];
+      if (!calendarData || (calendarData.errors?.length ?? 0) > 0) {
+        throw new CalendarProviderError(
+          'CALENDAR_UNAVAILABLE',
+          'No fue posible consultar la disponibilidad de Google',
+        );
+      }
+
+      return (calendarData.busy ?? [])
+        .map((busy) => {
+          const startAt = new Date(busy.start ?? '');
+          const endAt = new Date(busy.end ?? '');
+          if (
+            !busy.start ||
+            !busy.end ||
+            !Number.isFinite(startAt.getTime()) ||
+            !Number.isFinite(endAt.getTime()) ||
+            startAt.getTime() >= endAt.getTime()
+          ) {
+            throw new CalendarProviderError(
+              'CALENDAR_UNAVAILABLE',
+              'Google devolvió un intervalo de disponibilidad inválido',
+            );
+          }
+          return { startAt, endAt };
+        })
+        .sort(
+          (left, right) => left.startAt.getTime() - right.startAt.getTime(),
+        );
+    } catch (error) {
+      if (error instanceof CalendarProviderError) {
+        throw error;
+      }
+      const status = this.googleHttpStatus(error);
+      if (status === 401 || status === 403) {
+        throw new CalendarProviderError(
+          'CALENDAR_REAUTH_REQUIRED',
+          'La conexión de Google requiere autorización nuevamente',
+        );
+      }
+      throw new CalendarProviderError(
+        'CALENDAR_UNAVAILABLE',
+        'No fue posible consultar la disponibilidad de Google',
+      );
+    }
+  }
+
   async revoke(refreshToken: string): Promise<void> {
     try {
       await this.createClient().revokeToken(refreshToken);
@@ -88,6 +150,25 @@ export class GoogleCalendarProvider implements CalendarProvider {
         'No fue posible revocar la conexión de Google',
       );
     }
+  }
+
+  private googleHttpStatus(error: unknown): number | undefined {
+    if (typeof error !== 'object' || error === null) {
+      return undefined;
+    }
+    if (
+      'response' in error &&
+      typeof error.response === 'object' &&
+      error.response !== null &&
+      'status' in error.response &&
+      typeof error.response.status === 'number'
+    ) {
+      return error.response.status;
+    }
+    if ('code' in error && typeof error.code === 'number') {
+      return error.code;
+    }
+    return undefined;
   }
 
   private createClient(): InstanceType<typeof google.auth.OAuth2> {
