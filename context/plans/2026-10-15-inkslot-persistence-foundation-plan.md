@@ -31,8 +31,8 @@
 
 ## Pasos
 
-1. Escribir el test de integración de persistencia y conflicto de rangos.
-2. Actualizar `schema.prisma` con enums, relaciones y tipos PostgreSQL.
-3. Generar la migración Prisma, añadir SQL explícito para `btree_gist`, `tstzrange` y `EXCLUDE`.
-4. Ejecutar migración, generación de cliente, formato, build y tests locales.
+1. [x] Escribir el test de integración de persistencia y conflicto de rangos.
+2. [x] Actualizar `schema.prisma` con enums, relaciones y tipos PostgreSQL.
+3. [x] Generar la migración Prisma, añadir SQL explícito para `btree_gist`, `tstzrange` y `EXCLUDE`.
+4. [x] Ejecutar migración, generación de cliente, formato, build y tests locales.
 5. Registrar evidencia y crear un commit enfocado; el slice siguiente implementará auth sobre `Artist.password_hash`.

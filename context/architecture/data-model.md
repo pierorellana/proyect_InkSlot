@@ -2,7 +2,7 @@
 
 | Tabla | Campos clave / constraints |
 |---|---|
-| `artists` | `id uuid PK`, `email unique`, `password_hash`, `display_name`, `active` |
+| `artists` | `id uuid PK`, `email unique`, `password_hash` Argon2id, `display_name`, `active` |
 | `studio_settings` | `artist_id FK unique`, `timezone`, `slot_step_minutes`, `buffer_minutes`, `minimum_notice_hours`, `horizon_days` |
 | `weekly_availability` | `id`, `artist_id`, `weekday 0..6`, `start_local time`, `end_local time`, `check(start<end)` |
 | `availability_blocks` | `id`, `artist_id`, `start_at timestamptz`, `end_at`, `reason`, `check(start<end)` |
@@ -16,6 +16,12 @@
 | `sync_issues` | `id`, `appointment_id`, `operation`, `code`, `message_safe`, `status`, `last_attempt_at` |
 | `audit_logs` | `id`, `actor_type`, `actor_id?`, `entity_type`, `entity_id`, `action`, `changes jsonb`, `created_at` |
 | `idempotency_keys` | `key_hash`, `scope`, `request_hash`, `response_code`, `response_body jsonb`, `created_at`, `expires_at`; unique `(scope,key_hash)` |
+
+## Estado de implementación
+
+La migración Prisma `20261015203358_persistence_foundation` implementa estas tablas y relaciones en PostgreSQL local. La migración SQL habilita `btree_gist`, valida rangos y genera `appointments.time_range` como `tstzrange` semiabierto `[start_at,end_at)`, con `EXCLUDE` por artista para estados `CONFIRMED`, `COMPLETED` y `NO_SHOW`. Las citas `CANCELLED` no bloquean el intervalo.
+
+Los hashes de `booking_tokens` son la única representación persistida del enlace público; la generación, comparación, TTL y rotación pertenecen al slice de solicitudes/auth.
 
 ## Prevención real de conflictos
 Postgres `btree_gist`; columna `time_range tstzrange GENERATED ALWAYS AS (tstzrange(start_at,end_at,'[)')) STORED`; `EXCLUDE USING gist (artist_id WITH =, time_range WITH &&) WHERE (status IN ('confirmed','completed','no_show'))` — revisar si estados terminales deben reservar históricamente el mismo espacio antes de migración; opción recomendada: incluir todos salvo `cancelled` para preservar consistencia histórica. Testear con dos transacciones concurrentes. No depender solo de lock en app.
