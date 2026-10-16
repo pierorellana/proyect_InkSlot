@@ -30,7 +30,7 @@
 - Consumes: `DATABASE_URL`, Prisma schema existente y `hashBookingToken` de `api/src/requests/booking-token.ts`.
 - Produces: `npm run db:seed`, que ejecuta `prisma db seed` y crea el fixture `demo-token`.
 
-- [ ] **Step 1: Añadir la configuración Prisma al package manifest**
+- [x] **Step 1: Añadir la configuración Prisma al package manifest**
 
 En `api/package.json`, agregar el script:
 
@@ -46,7 +46,7 @@ y la configuración:
 }
 ```
 
-- [ ] **Step 2: Implementar el seed transaccional idempotente**
+- [x] **Step 2: Implementar el seed transaccional idempotente**
 
 En `api/prisma/seed.ts`, usar `PrismaClient`, `argon2`, `BookingRequestStatus`, `Prisma` y `hashBookingToken`. Crear el artista por `email`, configurar el estudio, reemplazar sus seis ventanas semanales, buscar/crear el cliente por artista y correo, buscar/crear la solicitud por artista/cliente/referencia, eliminar una eventual cita demo y sus outbox/auditorías, restablecer `PENDING`, reemplazar sus tokens y crear:
 
@@ -61,7 +61,7 @@ En `api/prisma/seed.ts`, usar `PrismaClient`, `argon2`, `BookingRequestStatus`, 
 
 El `finally` debe desconectar Prisma y el `catch` debe escribir el error y terminar con código distinto de cero.
 
-- [ ] **Step 3: Ejecutar el seed dos veces**
+- [x] **Step 3: Ejecutar el seed dos veces**
 
 Run from `api`:
 
@@ -72,7 +72,7 @@ PATH=/Users/jorge/.nvm/versions/node/v24.5.0/bin:$PATH npm run db:seed
 
 Expected: ambas ejecuciones terminan correctamente y la segunda no crea duplicados.
 
-- [ ] **Step 4: Commit del fixture**
+- [x] **Step 4: Commit del fixture**
 
 ```bash
 git add api/package.json api/prisma/seed.ts context/manifest.json context/tasks/backlog.md context/design/2026-10-16-inkslot-local-demo-seed-design.md context/plans/2026-10-16-inkslot-local-demo-seed-plan.md
@@ -88,7 +88,7 @@ git commit -m "feat(api): add local demo reservation seed"
 - Consumes: `GET /v1/public/reservations/demo-token`.
 - Produces: respuesta pública `200` y disponibilidad del fixture para Flutter.
 
-- [ ] **Step 1: Comprobar el endpoint público**
+- [x] **Step 1: Comprobar el endpoint público**
 
 ```bash
 curl -i http://127.0.0.1:3000/v1/public/reservations/demo-token
@@ -96,7 +96,7 @@ curl -i http://127.0.0.1:3000/v1/public/reservations/demo-token
 
 Expected: `HTTP/1.1 200 OK` y JSON con `status: "pending"`, `artist.displayName: "Dodogio"`, `durationMinutes: 60` y `timezone: "America/Guayaquil"`.
 
-- [ ] **Step 2: Ejecutar pruebas API**
+- [x] **Step 2: Ejecutar pruebas API**
 
 ```bash
 PATH=/Users/jorge/.nvm/versions/node/v24.5.0/bin:$PATH npm test -- --runInBand --watchman=false
@@ -105,7 +105,7 @@ PATH=/Users/jorge/.nvm/versions/node/v24.5.0/bin:$PATH npm run build
 
 Expected: suites y build existentes pasan sin cambios de contrato.
 
-- [ ] **Step 3: Regenerar la web con la API configurada**
+- [x] **Step 3: Regenerar la web con la API configurada**
 
 ```bash
 fvm flutter build web --dart-define=API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1
@@ -113,10 +113,18 @@ fvm flutter build web --dart-define=API_BASE_URL=https://9hqbzkgw-3000.use.devtu
 
 Expected: `✓ Built build/web`.
 
-- [ ] **Step 4: Commit de verificación si se añaden pruebas/documentación**
+- [x] **Step 4: Commit de verificación si se añaden pruebas/documentación**
 
 ```bash
 git status --short
 ```
 
 Expected: no cambios no relacionados y el fixture queda documentado en el backlog.
+
+## Resultado de ejecución — 2026-10-16
+
+- `npm run db:seed` ejecutado dos veces con Node 24.5.0; ambas ejecuciones conservaron los mismos IDs y no duplicaron el fixture.
+- `GET https://9hqbzkgw-3000.use.devtunnels.ms/v1/public/reservations/demo-token` devuelve `200` con estado `pending`, `Dodogio`, 60 minutos y zona `America/Guayaquil`.
+- `npm test -- --runInBand --watchman=false`: 329 pruebas y 18 suites aprobadas.
+- `npm run build`: compilación NestJS aprobada.
+- El build Flutter Web existente ya apunta al API del túnel y se mantiene sin cambios porque el seed no modifica el bundle.
