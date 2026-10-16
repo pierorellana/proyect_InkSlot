@@ -22,44 +22,40 @@ class AdminLoginPage extends StatefulWidget {
 }
 
 class _AdminLoginPageState extends State<AdminLoginPage> {
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  String? _emailError;
+  String? _usernameError;
   String? _passwordError;
   int _shakes = 0;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  String? _validateEmail(String value) {
-    final email = value.trim();
-    if (email.isEmpty) return 'Ingresa tu correo electrónico.';
-    if (!email.contains('@') || !email.contains('.')) {
-      return 'Revisa el formato del correo.';
-    }
+  String? _validateUsername(String value) {
+    if (value.trim().isEmpty) return 'Ingresa tu usuario.';
     return null;
   }
 
   Future<void> _submit() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final emailError = _validateEmail(_emailController.text);
+    final usernameError = _validateUsername(_usernameController.text);
     final passwordError = _passwordController.text.isEmpty
         ? 'Escribe tu contraseña para entrar.'
         : null;
     widget.sessionController.clearError();
     setState(() {
-      _emailError = emailError;
+      _usernameError = usernameError;
       _passwordError = passwordError;
-      if (emailError != null || passwordError != null) _shakes++;
+      if (usernameError != null || passwordError != null) _shakes++;
     });
-    if (emailError != null || passwordError != null) return;
+    if (usernameError != null || passwordError != null) return;
 
     await widget.sessionController.login(
-      _emailController.text,
+      _usernameController.text,
       _passwordController.text,
     );
     if (!mounted) return;
@@ -105,9 +101,9 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                             bottomInset,
                           ),
                           child: _LoginContent(
-                            emailController: _emailController,
+                            usernameController: _usernameController,
                             passwordController: _passwordController,
-                            emailError: _emailError,
+                            usernameError: _usernameError,
                             passwordError: _passwordError,
                             shakes: _shakes,
                             sessionController: widget.sessionController,
@@ -130,18 +126,18 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
 class _LoginContent extends StatelessWidget {
   const _LoginContent({
-    required this.emailController,
+    required this.usernameController,
     required this.passwordController,
-    required this.emailError,
+    required this.usernameError,
     required this.passwordError,
     required this.shakes,
     required this.sessionController,
     required this.onSubmit,
   });
 
-  final TextEditingController emailController;
+  final TextEditingController usernameController;
   final TextEditingController passwordController;
-  final String? emailError;
+  final String? usernameError;
   final String? passwordError;
   final int shakes;
   final AdminSessionController sessionController;
@@ -199,15 +195,15 @@ class _LoginContent extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   InkSlotField(
-                    label: 'Correo',
-                    controller: emailController,
-                    keyboardType: TextInputType.emailAddress,
+                    label: 'Usuario',
+                    controller: usernameController,
+                    keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
                     autofillHints: const [
                       AutofillHints.username,
                       AutofillHints.email,
                     ],
-                    errorText: emailError,
+                    errorText: usernameError,
                   ),
                   const SizedBox(height: 14),
                   InkSlotField(

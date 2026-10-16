@@ -40,7 +40,7 @@ void main() {
     await tester.tap(find.text('Entrar'));
     await tester.pump();
 
-    expect(find.text('Ingresa tu correo electrónico.'), findsOneWidget);
+    expect(find.text('Ingresa tu usuario.'), findsOneWidget);
     expect(find.text('Escribe tu contraseña para entrar.'), findsOneWidget);
     expect(repository.loginCalled, isFalse);
   });

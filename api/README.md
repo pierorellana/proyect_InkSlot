@@ -13,11 +13,16 @@ cd api
 cp .env.example .env
 npm install
 npx prisma migrate dev
+npm run db:seed
 npm run start:dev
 ```
 
 The health endpoint is available at `http://localhost:3000/v1/health` and
 reports the PostgreSQL connectivity state.
+
+For the local demo admin, open the Flutter Web hash route
+`/#/admin/login` and use `dodo` / `1234`. These credentials are local demo
+configuration only; production credentials must be provisioned separately.
 
 ## Checks
 

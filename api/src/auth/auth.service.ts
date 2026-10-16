@@ -6,6 +6,7 @@ import { PrismaService } from '../database/prisma.service';
 import {
   ADMIN_SESSION_TTL_MS,
   ADMIN_SESSION_TTL_SECONDS,
+  resolveLoginEmail,
 } from './auth.constants';
 
 export type AuthUser = {
@@ -34,7 +35,7 @@ export class AuthService {
 
   async login(email: string, password: string): Promise<AuthLoginResult> {
     const artist = await this.prisma.artist.findUnique({
-      where: { email: email.trim().toLowerCase() },
+      where: { email: resolveLoginEmail(email) },
     });
 
     if (!artist?.active) {

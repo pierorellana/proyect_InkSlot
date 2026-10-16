@@ -6,7 +6,12 @@ import { hashBookingToken } from '../src/requests/booking-token';
 const prisma = new PrismaClient();
 
 const DEMO_TOKEN = 'demo-token';
-const DEMO_ARTIST_EMAIL = 'demo@inkslot.local';
+const DEMO_ARTIST_EMAIL =
+  process.env.DEMO_ARTIST_EMAIL?.trim().toLowerCase() ||
+  'demo@inkslot.local';
+const DEMO_LOGIN_USERNAME =
+  process.env.DEMO_LOGIN_USERNAME?.trim().toLowerCase() || 'dodo';
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD || '1234';
 const DEMO_PAYMENT_REFERENCE = 'demo-local-seed';
 const DEMO_ARTIST_NAME = 'Dodogio';
 const DEMO_CLIENT_EMAIL = 'cliente-demo@inkslot.local';
@@ -40,7 +45,7 @@ async function resetDemoAppointment(
 }
 
 async function seed(): Promise<void> {
-  const demoPasswordHash = await argon2.hash('demo-password', {
+  const demoPasswordHash = await argon2.hash(DEMO_PASSWORD, {
     type: argon2.argon2id,
   });
   const now = new Date();
@@ -56,6 +61,7 @@ async function seed(): Promise<void> {
         active: true,
       },
       update: {
+        passwordHash: demoPasswordHash,
         displayName: DEMO_ARTIST_NAME,
         active: true,
       },
@@ -192,6 +198,7 @@ async function seed(): Promise<void> {
       seeded: true,
       token: DEMO_TOKEN,
       artistEmail: DEMO_ARTIST_EMAIL,
+      loginUsername: DEMO_LOGIN_USERNAME,
       ...result,
     }),
   );
