@@ -98,7 +98,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('ESE HORARIO CAMBIÓ'), findsOneWidget);
-    expect(find.text('Reintentar'), findsOneWidget);
+    expect(find.text('Reintentar'), findsNothing);
     await tester.ensureVisible(find.text('Volver'));
     await tester.tap(find.text('Volver'));
     expect(returned, isTrue);

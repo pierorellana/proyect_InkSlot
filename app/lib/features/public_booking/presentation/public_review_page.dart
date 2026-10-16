@@ -137,6 +137,7 @@ class _ReviewContent extends StatelessWidget {
         confirmationStatus != PublicConfirmationStatus.idle &&
         confirmationStatus != PublicConfirmationStatus.loading &&
         confirmationStatus != PublicConfirmationStatus.confirmed;
+    final canConfirm = _canConfirm(confirmationStatus);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -182,12 +183,12 @@ class _ReviewContent extends StatelessWidget {
           label: confirmationStatus == PublicConfirmationStatus.loading
               ? 'Confirmando…'
               : 'Confirmar reserva',
-          onPressed: confirmationStatus == PublicConfirmationStatus.loading
-              ? null
-              : () async {
+          onPressed: canConfirm
+              ? () async {
                   final confirmation = await controller.confirmSelected(token);
                   if (confirmation != null) onConfirmed();
-                },
+                }
+              : null,
           trailing: confirmationStatus == PublicConfirmationStatus.loading
               ? const SizedBox(
                   width: 18,
@@ -422,7 +423,12 @@ String _confirmationMessage(
 };
 
 bool _canRetry(PublicConfirmationStatus status) =>
-    status == PublicConfirmationStatus.conflict ||
+    status == PublicConfirmationStatus.calendarUnavailable ||
+    status == PublicConfirmationStatus.offline ||
+    status == PublicConfirmationStatus.error;
+
+bool _canConfirm(PublicConfirmationStatus status) =>
+    status == PublicConfirmationStatus.idle ||
     status == PublicConfirmationStatus.calendarUnavailable ||
     status == PublicConfirmationStatus.offline ||
     status == PublicConfirmationStatus.error;
