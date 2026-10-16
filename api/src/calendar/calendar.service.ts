@@ -16,6 +16,8 @@ import {
   CalendarProviderError,
   type CalendarBusyInterval,
   type CalendarProvider,
+  type CalendarEventInput as ProviderCalendarEventInput,
+  type CalendarEventResult,
 } from './calendar.provider';
 import { CalendarStateService } from './calendar.state.service';
 
@@ -37,6 +39,11 @@ export type CalendarBusyQueryInput = {
   timeMax: Date;
   timeZone: string;
 };
+
+export type CalendarEventInput = Omit<
+  ProviderCalendarEventInput,
+  'refreshToken'
+>;
 
 const safeError = (code: string, message: string) => ({
   error: { code, message },
@@ -112,6 +119,40 @@ export class CalendarService {
           'No fue posible verificar la disponibilidad del calendario',
         ),
       );
+    }
+  }
+
+  async createEvent(
+    artistId: string,
+    input: CalendarEventInput,
+  ): Promise<CalendarEventResult> {
+    const connection = await this.loadEventConnection(artistId);
+
+    try {
+      return await this.provider.createEvent({
+        ...input,
+        refreshToken: connection.refreshToken,
+        calendarId: connection.calendarId,
+      });
+    } catch (error) {
+      return this.throwSafeEventError(artistId, error);
+    }
+  }
+
+  async getEvent(
+    artistId: string,
+    eventId: string,
+  ): Promise<CalendarEventResult | null> {
+    const connection = await this.loadEventConnection(artistId);
+
+    try {
+      return await this.provider.getEvent({
+        refreshToken: connection.refreshToken,
+        calendarId: connection.calendarId,
+        eventId,
+      });
+    } catch (error) {
+      return this.throwSafeEventError(artistId, error);
     }
   }
 
@@ -244,6 +285,95 @@ export class CalendarService {
       where: { artistId },
       data: { status: CalendarConnectionStatus.NEEDS_RECONNECT },
     });
+  }
+
+  private async loadEventConnection(artistId: string): Promise<{
+    calendarId: string;
+    refreshToken: string;
+  }> {
+    if (!this.config.configured) {
+      throw new CalendarProviderError(
+        'CALENDAR_NOT_CONFIGURED',
+        'La integración de Calendar no está configurada',
+      );
+    }
+
+    try {
+      const connection = await this.prisma.calendarConnection.findUnique({
+        where: { artistId },
+      });
+      if (
+        !connection ||
+        connection.status !== CalendarConnectionStatus.CONNECTED
+      ) {
+        throw new CalendarProviderError(
+          'CALENDAR_UNAVAILABLE',
+          'La conexión de Calendar no está disponible',
+        );
+      }
+
+      try {
+        return {
+          calendarId: connection.calendarId,
+          refreshToken: this.crypto.decrypt(connection.encryptedRefreshToken),
+        };
+      } catch {
+        throw new CalendarProviderError(
+          'CALENDAR_UNAVAILABLE',
+          'La conexión de Calendar no está disponible',
+        );
+      }
+    } catch (error) {
+      if (error instanceof CalendarProviderError) {
+        throw error;
+      }
+      throw new CalendarProviderError(
+        'CALENDAR_UNAVAILABLE',
+        'La conexión de Calendar no está disponible',
+      );
+    }
+  }
+
+  private async throwSafeEventError(
+    artistId: string,
+    error: unknown,
+  ): Promise<never> {
+    const safeErrorValue = this.toSafeEventError(error);
+
+    if (safeErrorValue.code === 'CALENDAR_REAUTH_REQUIRED') {
+      try {
+        await this.markNeedsReconnect(artistId);
+      } catch {
+        // Keep the provider error safe and typed if the local status transition fails.
+      }
+    }
+
+    throw safeErrorValue;
+  }
+
+  private toSafeEventError(error: unknown): CalendarProviderError {
+    if (!(error instanceof CalendarProviderError)) {
+      return new CalendarProviderError(
+        'CALENDAR_UNAVAILABLE',
+        'No fue posible sincronizar el evento con Google Calendar',
+      );
+    }
+
+    const safeMessages: Record<CalendarProviderError['code'], string> = {
+      CALENDAR_NOT_CONFIGURED: 'La integración de Calendar no está configurada',
+      CALENDAR_UNAVAILABLE:
+        'No fue posible sincronizar el evento con Google Calendar',
+      CALENDAR_REAUTH_REQUIRED:
+        'La conexión de Google requiere autorización nuevamente',
+      CALENDAR_EVENT_EXISTS: 'El evento de Calendar ya existe',
+      OAUTH_ACCESS_DENIED: 'La autorización de Google fue cancelada',
+    };
+
+    return new CalendarProviderError(
+      error.code,
+      safeMessages[error.code] ??
+        'No fue posible sincronizar el evento con Google Calendar',
+    );
   }
 
   private requireConfigured(): void {

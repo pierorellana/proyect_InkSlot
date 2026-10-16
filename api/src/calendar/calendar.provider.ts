@@ -20,10 +20,27 @@ export type CalendarBusyInterval = {
   endAt: Date;
 };
 
+export type CalendarEventInput = {
+  refreshToken: string;
+  calendarId: string;
+  eventId: string;
+  summary: string;
+  description: string;
+  startAt: Date;
+  endAt: Date;
+  timeZone: string;
+};
+
+export type CalendarEventResult = {
+  externalEventId: string;
+  etag: string | null;
+};
+
 export type CalendarProviderErrorCode =
   | 'CALENDAR_NOT_CONFIGURED'
   | 'CALENDAR_UNAVAILABLE'
   | 'CALENDAR_REAUTH_REQUIRED'
+  | 'CALENDAR_EVENT_EXISTS'
   | 'OAUTH_ACCESS_DENIED';
 
 export class CalendarProviderError extends Error {
@@ -41,5 +58,11 @@ export interface CalendarProvider {
   exchangeCode(code: string): Promise<CalendarTokens>;
   listCalendars(refreshToken: string): Promise<CalendarSummary[]>;
   freeBusy(input: CalendarBusyQuery): Promise<CalendarBusyInterval[]>;
+  createEvent(input: CalendarEventInput): Promise<CalendarEventResult>;
+  getEvent(input: {
+    refreshToken: string;
+    calendarId: string;
+    eventId: string;
+  }): Promise<CalendarEventResult | null>;
   revoke(refreshToken: string): Promise<void>;
 }

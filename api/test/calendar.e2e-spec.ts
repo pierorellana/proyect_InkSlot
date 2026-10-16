@@ -42,6 +42,11 @@ describe('admin calendar connection', () => {
       .fn()
       .mockResolvedValue([{ id: 'inkslot-id', name: 'InkSlot' }]),
     freeBusy: jest.fn().mockResolvedValue([]),
+    createEvent: jest.fn().mockResolvedValue({
+      externalEventId: 'google-event-id',
+      etag: null,
+    }),
+    getEvent: jest.fn().mockResolvedValue(null),
     revoke: jest.fn().mockResolvedValue(undefined),
   } as jest.Mocked<CalendarProvider>;
 

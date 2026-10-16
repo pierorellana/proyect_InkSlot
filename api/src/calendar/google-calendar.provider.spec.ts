@@ -4,6 +4,7 @@ import type { CalendarConfig } from './calendar.config';
 import {
   CalendarProviderError,
   type CalendarBusyQuery,
+  type CalendarEventInput,
   type CalendarProviderErrorCode,
 } from './calendar.provider';
 import { GoogleCalendarProvider } from './google-calendar.provider';
@@ -25,10 +26,28 @@ describe('GoogleCalendarProvider.freeBusy', () => {
     timeZone: 'America/Guayaquil',
   };
   const rawMessage = `raw-google-error ${input.refreshToken}`;
+  const eventInput: CalendarEventInput = {
+    refreshToken: input.refreshToken,
+    calendarId: input.calendarId,
+    eventId: 'inkslot-appointment-event',
+    summary: 'InkSlot — Client name',
+    description: 'Reserva InkSlot · 120 min',
+    startAt: new Date('2026-10-23T15:00:00Z'),
+    endAt: new Date('2026-10-23T17:00:00Z'),
+    timeZone: input.timeZone,
+  };
   let provider: GoogleCalendarProvider;
   let query: jest.Mock<
     Promise<{ data: calendar_v3.Schema$FreeBusyResponse }>,
     [calendar_v3.Params$Resource$Freebusy$Query]
+  >;
+  let insert: jest.Mock<
+    Promise<{ data: calendar_v3.Schema$Event }>,
+    [calendar_v3.Params$Resource$Events$Insert]
+  >;
+  let get: jest.Mock<
+    Promise<{ data: calendar_v3.Schema$Event }>,
+    [calendar_v3.Params$Resource$Events$Get]
   >;
 
   beforeEach(() => {
@@ -39,8 +58,11 @@ describe('GoogleCalendarProvider.freeBusy', () => {
     query.mockResolvedValue({
       data: { calendars: { [input.calendarId]: { busy: [] } } },
     });
+    insert = jest.fn();
+    get = jest.fn();
     jest.spyOn(google, 'calendar').mockReturnValue({
       freebusy: { query },
+      events: { insert, get },
     } as never);
     provider = new GoogleCalendarProvider(config);
   });
@@ -257,4 +279,114 @@ describe('GoogleCalendarProvider.freeBusy', () => {
       expect(query).not.toHaveBeenCalled();
     },
   );
+
+  it('creates an event with a deterministic id, UTC instants, timezone and no notifications', async () => {
+    insert.mockResolvedValue({
+      data: { id: eventInput.eventId, etag: '"event-etag"' },
+    });
+    const setCredentials = jest.spyOn(
+      google.auth.OAuth2.prototype,
+      'setCredentials',
+    );
+
+    await expect(provider.createEvent(eventInput)).resolves.toEqual({
+      externalEventId: eventInput.eventId,
+      etag: '"event-etag"',
+    });
+    expect(setCredentials).toHaveBeenCalledWith({
+      refresh_token: eventInput.refreshToken,
+    });
+    expect(insert).toHaveBeenCalledWith({
+      calendarId: eventInput.calendarId,
+      sendUpdates: 'none',
+      requestBody: {
+        id: eventInput.eventId,
+        summary: eventInput.summary,
+        description: eventInput.description,
+        start: {
+          dateTime: eventInput.startAt.toISOString(),
+          timeZone: eventInput.timeZone,
+        },
+        end: {
+          dateTime: eventInput.endAt.toISOString(),
+          timeZone: eventInput.timeZone,
+        },
+      },
+    });
+  });
+
+  it('gets an existing event by the same deterministic id', async () => {
+    get.mockResolvedValue({
+      data: { id: eventInput.eventId, etag: '"stored-etag"' },
+    });
+
+    await expect(
+      provider.getEvent({
+        refreshToken: eventInput.refreshToken,
+        calendarId: eventInput.calendarId,
+        eventId: eventInput.eventId,
+      }),
+    ).resolves.toEqual({
+      externalEventId: eventInput.eventId,
+      etag: '"stored-etag"',
+    });
+    expect(get).toHaveBeenCalledWith({
+      calendarId: eventInput.calendarId,
+      eventId: eventInput.eventId,
+    });
+  });
+
+  it('returns null when the deterministic event is absent', async () => {
+    get.mockRejectedValue({ response: { status: 404 }, message: rawMessage });
+
+    await expect(
+      provider.getEvent({
+        refreshToken: eventInput.refreshToken,
+        calendarId: eventInput.calendarId,
+        eventId: eventInput.eventId,
+      }),
+    ).resolves.toBeNull();
+  });
+
+  it.each([{ response: { status: 401 } }, { response: { status: 403 } }])(
+    'maps event authorization failures to a safe reauth error: %j',
+    async (error) => {
+      insert.mockRejectedValue({ ...error, message: rawMessage });
+
+      await expectSafeEventError('CALENDAR_REAUTH_REQUIRED');
+    },
+  );
+
+  it.each([{ response: { status: 500 } }, { response: { status: 429 } }])(
+    'maps event provider failures to a safe unavailable error: %j',
+    async (error) => {
+      insert.mockRejectedValue({ ...error, message: rawMessage });
+
+      await expectSafeEventError('CALENDAR_UNAVAILABLE');
+    },
+  );
+
+  it('maps an insert conflict to a typed event-exists error for recovery', async () => {
+    insert.mockRejectedValue({
+      response: { status: 409 },
+      message: rawMessage,
+    });
+
+    await expectSafeEventError('CALENDAR_EVENT_EXISTS');
+  });
+
+  async function expectSafeEventError(
+    code: CalendarProviderErrorCode,
+  ): Promise<void> {
+    const error: unknown = await provider
+      .createEvent(eventInput)
+      .catch((failure: unknown) => failure);
+    expect(error).toBeInstanceOf(CalendarProviderError);
+    if (!(error instanceof CalendarProviderError)) {
+      throw new Error('Expected a CalendarProviderError');
+    }
+    expect(error.code).toBe(code);
+    expect(error.message).not.toContain(eventInput.refreshToken);
+    expect(error.message).not.toContain('raw-google-error');
+  }
 });

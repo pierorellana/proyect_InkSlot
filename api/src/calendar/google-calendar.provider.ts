@@ -6,6 +6,8 @@ import {
   CalendarProviderError,
   type CalendarBusyInterval,
   type CalendarBusyQuery,
+  type CalendarEventInput,
+  type CalendarEventResult,
   type CalendarProvider,
   type CalendarSummary,
   type CalendarTokens,
@@ -141,6 +143,83 @@ export class GoogleCalendarProvider implements CalendarProvider {
     }
   }
 
+  async createEvent(input: CalendarEventInput): Promise<CalendarEventResult> {
+    try {
+      const client = this.createClient();
+      client.setCredentials({ refresh_token: input.refreshToken });
+      const calendar = google.calendar({ version: 'v3', auth: client });
+      const response = await calendar.events.insert({
+        calendarId: input.calendarId,
+        sendUpdates: 'none',
+        requestBody: {
+          id: input.eventId,
+          summary: input.summary,
+          description: input.description,
+          start: {
+            dateTime: input.startAt.toISOString(),
+            timeZone: input.timeZone,
+          },
+          end: {
+            dateTime: input.endAt.toISOString(),
+            timeZone: input.timeZone,
+          },
+        },
+      });
+      const externalEventId = response.data.id;
+      if (!externalEventId) {
+        throw new CalendarProviderError(
+          'CALENDAR_UNAVAILABLE',
+          'Google no devolvió el identificador del evento',
+        );
+      }
+      return {
+        externalEventId,
+        etag: response.data.etag ?? null,
+      };
+    } catch (error) {
+      if (error instanceof CalendarProviderError) {
+        throw error;
+      }
+      throw this.toEventError(error);
+    }
+  }
+
+  async getEvent(input: {
+    refreshToken: string;
+    calendarId: string;
+    eventId: string;
+  }): Promise<CalendarEventResult | null> {
+    try {
+      const client = this.createClient();
+      client.setCredentials({ refresh_token: input.refreshToken });
+      const calendar = google.calendar({ version: 'v3', auth: client });
+      const response = await calendar.events.get({
+        calendarId: input.calendarId,
+        eventId: input.eventId,
+      });
+      const externalEventId = response.data.id;
+      if (!externalEventId) {
+        throw new CalendarProviderError(
+          'CALENDAR_UNAVAILABLE',
+          'Google no devolvió el identificador del evento',
+        );
+      }
+      return {
+        externalEventId,
+        etag: response.data.etag ?? null,
+      };
+    } catch (error) {
+      const status = this.googleHttpStatus(error);
+      if (status === 404) {
+        return null;
+      }
+      if (error instanceof CalendarProviderError) {
+        throw error;
+      }
+      throw this.toEventError(error);
+    }
+  }
+
   async revoke(refreshToken: string): Promise<void> {
     try {
       await this.createClient().revokeToken(refreshToken);
@@ -169,6 +248,26 @@ export class GoogleCalendarProvider implements CalendarProvider {
       return error.code;
     }
     return undefined;
+  }
+
+  private toEventError(error: unknown): CalendarProviderError {
+    const status = this.googleHttpStatus(error);
+    if (status === 401 || status === 403) {
+      return new CalendarProviderError(
+        'CALENDAR_REAUTH_REQUIRED',
+        'La conexión de Google requiere autorización nuevamente',
+      );
+    }
+    if (status === 409) {
+      return new CalendarProviderError(
+        'CALENDAR_EVENT_EXISTS',
+        'El evento de Calendar ya existe',
+      );
+    }
+    return new CalendarProviderError(
+      'CALENDAR_UNAVAILABLE',
+      'No fue posible sincronizar el evento con Google Calendar',
+    );
   }
 
   private createClient(): InstanceType<typeof google.auth.OAuth2> {

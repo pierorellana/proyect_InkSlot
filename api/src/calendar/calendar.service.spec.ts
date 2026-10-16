@@ -11,6 +11,7 @@ import { CalendarCrypto } from './calendar.crypto';
 import {
   CalendarProviderError,
   type CalendarProvider,
+  type CalendarEventInput,
   type CalendarProviderErrorCode,
 } from './calendar.provider';
 import {
@@ -33,6 +34,15 @@ describe('CalendarService.queryBusy', () => {
   };
   const refreshToken = 'test-refresh-token';
   const rawDetail = 'private upstream diagnostic';
+  const eventInput: Omit<CalendarEventInput, 'refreshToken'> = {
+    calendarId: connection.calendarId,
+    eventId: 'inkslot-appointment-event',
+    summary: 'InkSlot — Client name',
+    description: 'Reserva InkSlot · 120 min',
+    startAt: new Date('2026-10-23T15:00:00Z'),
+    endAt: new Date('2026-10-23T17:00:00Z'),
+    timeZone: 'America/Guayaquil',
+  };
   const prisma = {
     calendarConnection: {
       findUnique: jest.fn<
@@ -59,6 +69,14 @@ describe('CalendarService.queryBusy', () => {
     freeBusy: jest.fn<
       ReturnType<CalendarProvider['freeBusy']>,
       Parameters<CalendarProvider['freeBusy']>
+    >(),
+    createEvent: jest.fn<
+      ReturnType<CalendarProvider['createEvent']>,
+      Parameters<CalendarProvider['createEvent']>
+    >(),
+    getEvent: jest.fn<
+      ReturnType<CalendarProvider['getEvent']>,
+      Parameters<CalendarProvider['getEvent']>
     >(),
     revoke: jest.fn(),
   } satisfies jest.Mocked<CalendarProvider>;
@@ -169,6 +187,86 @@ describe('CalendarService.queryBusy', () => {
     expect(crypto.decrypt).not.toHaveBeenCalled();
     expect(provider.freeBusy).not.toHaveBeenCalled();
     expect(prisma.calendarConnection.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('decrypts the stored token and creates an event in the selected calendar', async () => {
+    const result = {
+      externalEventId: eventInput.eventId,
+      etag: '"event-etag"',
+    };
+    provider.createEvent.mockResolvedValue(result);
+
+    await expect(service.createEvent(artistId, eventInput)).resolves.toEqual(
+      result,
+    );
+    expect(prisma.calendarConnection.findUnique).toHaveBeenCalledWith({
+      where: { artistId },
+    });
+    expect(crypto.decrypt).toHaveBeenCalledWith(
+      connection.encryptedRefreshToken,
+    );
+    expect(provider.createEvent).toHaveBeenCalledWith({
+      ...eventInput,
+      refreshToken,
+    });
+  });
+
+  it('gets an event through the selected connected calendar without exposing the token', async () => {
+    const result = {
+      externalEventId: eventInput.eventId,
+      etag: '"stored-etag"',
+    };
+    provider.getEvent.mockResolvedValue(result);
+
+    await expect(
+      service.getEvent(artistId, eventInput.eventId),
+    ).resolves.toEqual(result);
+    expect(crypto.decrypt).toHaveBeenCalledWith(
+      connection.encryptedRefreshToken,
+    );
+    expect(provider.getEvent).toHaveBeenCalledWith({
+      refreshToken,
+      calendarId: connection.calendarId,
+      eventId: eventInput.eventId,
+    });
+  });
+
+  it('returns a typed safe error and marks the connection for reauthorization', async () => {
+    provider.createEvent.mockRejectedValue(
+      new CalendarProviderError('CALENDAR_REAUTH_REQUIRED', rawDetail),
+    );
+
+    const error: unknown = await service
+      .createEvent(artistId, eventInput)
+      .catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(CalendarProviderError);
+    if (!(error instanceof CalendarProviderError)) {
+      throw new Error('Expected a CalendarProviderError');
+    }
+    expect(error.code).toBe('CALENDAR_REAUTH_REQUIRED');
+    expect(error.message).not.toContain(rawDetail);
+    expect(error.message).not.toContain(refreshToken);
+    expect(prisma.calendarConnection.updateMany).toHaveBeenCalledWith({
+      where: { artistId },
+      data: { status: CalendarConnectionStatus.NEEDS_RECONNECT },
+    });
+  });
+
+  it('fails safely with a typed unavailable error when no connected calendar exists', async () => {
+    prisma.calendarConnection.findUnique.mockResolvedValue(null);
+
+    const error: unknown = await service
+      .getEvent(artistId, eventInput.eventId)
+      .catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(CalendarProviderError);
+    if (!(error instanceof CalendarProviderError)) {
+      throw new Error('Expected a CalendarProviderError');
+    }
+    expect(error.code).toBe('CALENDAR_UNAVAILABLE');
+    expect(crypto.decrypt).not.toHaveBeenCalled();
+    expect(provider.getEvent).not.toHaveBeenCalled();
   });
 
   it.each<[string, Partial<CalendarBusyQueryInput>]>([
