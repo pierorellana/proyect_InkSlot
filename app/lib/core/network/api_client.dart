@@ -143,10 +143,17 @@ class HttpApiClient implements RestApiClient {
   }
 
   Uri _buildUri(String path) {
+    final parsedPath = Uri.parse(path);
     final basePath = _baseUri.path.replaceFirst(RegExp(r'/+$'), '');
-    final requestPath = path.replaceFirst(RegExp(r'^/+'), '');
+    final requestPath = parsedPath.path.replaceFirst(RegExp(r'^/+'), '');
 
-    return _baseUri.replace(path: '$basePath/$requestPath');
+    return _baseUri.replace(
+      path: '$basePath/$requestPath',
+      queryParameters: parsedPath.hasQuery
+          ? parsedPath.queryParameters
+          : null,
+      fragment: parsedPath.hasFragment ? parsedPath.fragment : null,
+    );
   }
 
   Object _decode(String body) {

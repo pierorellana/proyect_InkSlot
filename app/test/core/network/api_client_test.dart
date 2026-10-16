@@ -32,6 +32,28 @@ void main() {
     });
   });
 
+  test('keeps query parameters separate when joining API paths', () async {
+    final client = RecordingHttpClient((request) async {
+      expect(
+        request.url,
+        Uri.parse(
+          'https://api.example.test/v1/public/reservations/demo-token/availability'
+          '?from=2026-10-16&to=2026-10-31',
+        ),
+      );
+      return http.Response('{"days":[],"timezone":"UTC"}', 200);
+    });
+    final api = HttpApiClient(
+      client: client,
+      baseUri: Uri.parse('https://api.example.test/v1'),
+    );
+
+    await api.getJson(
+      '/public/reservations/demo-token/availability'
+      '?from=2026-10-16&to=2026-10-31',
+    );
+  });
+
   test('posts JSON and accepts an empty successful response', () async {
     final client = RecordingHttpClient((request) async {
       expect(request.method, 'POST');
