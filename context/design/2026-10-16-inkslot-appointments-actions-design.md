@@ -1,7 +1,7 @@
 # Diseño: acciones administrativas de citas y sincronización Calendar
 
 **Fecha:** 2026-10-16  
-**Estado:** propuesta para revisión de la spec escrita  
+**Estado:** aprobada para planificar e implementar
 **Alcance:** T-016 — listado/detalle de citas, reprogramación, cancelación, completar, no-show y proyección Calendar update/delete
 
 ## Objetivo
