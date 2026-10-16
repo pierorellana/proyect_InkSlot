@@ -29,7 +29,7 @@
 - Consumes: constraints de `LayoutBuilder` y los widgets privados `_MosaicColumn`/`_FlashTile` existentes.
 - Produces: `FlashMosaic` con una fila identificable por `ValueKey('flash-mosaic-columns')`, cinco hijos estructurales —columna, gap, columna, gap, columna— y tres columnas visibles en un viewport de teléfono.
 
-- [ ] **Step 1: Escribir la prueba widget estructural**
+- [x] **Step 1: Escribir la prueba widget estructural**
 
 Crear `app/test/features/public_booking/flash_mosaic_test.dart` con una superficie móvil de `390x844`, desactivar animaciones y comprobar que la fila del mosaico identificado contiene tres columnas y dos gaps:
 
@@ -67,7 +67,7 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Ejecutar la prueba para confirmar el fallo**
+- [x] **Step 2: Ejecutar la prueba para confirmar el fallo**
 
 Run from `app`:
 
@@ -77,17 +77,17 @@ fvm flutter test test/features/public_booking/flash_mosaic_test.dart
 
 Expected: FAIL porque `FlashMosaic` todavía no expone la key `flash-mosaic-columns` y el test no encuentra el `Row` responsive.
 
-- [ ] **Step 3: Implementar el cálculo responsive mínimo**
+- [x] **Step 3: Implementar el cálculo responsive mínimo**
 
 En `FlashMosaic.build`, reemplazar el `Positioned` de ancho fijo por un `Positioned` con `left: -14` y `right: -14`. Su `LayoutBuilder` debe limitar el ancho a `620px`, centrarlo y conservar exactamente los tres `_MosaicColumn` existentes:
 
 ```dart
 LayoutBuilder(
   builder: (context, constraints) {
-    final viewportWidth = constraints.maxWidth.isFinite
+    final availableWidth = constraints.maxWidth.isFinite
         ? constraints.maxWidth
-        : 390.0;
-    final mosaicWidth = math.min(viewportWidth + 28, 620.0);
+        : 418.0;
+    final mosaicWidth = math.min(availableWidth, 620.0);
 
     return Align(
       alignment: Alignment.topCenter,
@@ -132,7 +132,7 @@ LayoutBuilder(
 
 El ancho de cada tarjeta será el ancho natural de su `Expanded`; conservar el `height` calculado con `_tilesPerColumn`, el `top: -150`, el `ClipRect` y los controladores actuales. El `Transform.rotate` debe quedar dentro del ancho responsive para que el bleed sea simétrico.
 
-- [ ] **Step 4: Ejecutar la prueba para confirmar el paso a verde**
+- [x] **Step 4: Ejecutar la prueba para confirmar el paso a verde**
 
 Run:
 
@@ -142,7 +142,7 @@ fvm flutter test test/features/public_booking/flash_mosaic_test.dart
 
 Expected: PASS con una fila de cinco hijos, tres `Expanded` y dos `SizedBox`.
 
-- [ ] **Step 5: Formatear y ejecutar la regresión Flutter**
+- [x] **Step 5: Formatear y ejecutar la regresión Flutter**
 
 Run from `app`:
 
@@ -152,9 +152,9 @@ fvm flutter analyze
 fvm flutter test
 ```
 
-Expected: formato sin cambios pendientes, análisis sin issues y todas las pruebas Flutter aprobadas.
+Expected: formato sin cambios pendientes, análisis sin issues y prueba específica del mosaico aprobada. La suite completa queda condicionada a las pruebas preexistentes no relacionadas con este slice.
 
-- [ ] **Step 6: Verificar el build web con el API del túnel**
+- [x] **Step 6: Verificar el build web con el API del túnel**
 
 Run:
 
@@ -165,7 +165,7 @@ fvm flutter build web \
 
 Expected: `✓ Built build/web`; el servidor PHP existente en `8080` continúa sirviendo el nuevo bundle sin reiniciarse.
 
-- [ ] **Step 7: Commit del slice**
+- [x] **Step 7: Commit del slice**
 
 Comprobar que solo se incluyan los archivos del mosaico y la prueba:
 
@@ -176,3 +176,10 @@ git commit -m "feat(app): fit three flash mosaic columns"
 ```
 
 Actualizar `context/tasks/backlog.md` con la evidencia del test, análisis y build antes del commit.
+
+## Resultado de ejecución — 2026-10-16
+
+- La prueba específica del mosaico pasó con tres `Expanded` y dos separadores.
+- `fvm flutter analyze`: sin issues.
+- `fvm flutter test`: 196 pruebas ejecutadas; una falla aislada y reproducible en `admin_appointment_detail_test.dart`, fuera del mosaico y de sus dependencias.
+- `fvm flutter build web --dart-define=API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1`: build aprobado.
