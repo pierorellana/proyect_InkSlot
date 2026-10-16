@@ -1,13 +1,21 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { AppointmentStatus, Prisma } from '@prisma/client';
+import { AppointmentStatus, Prisma, SyncStatus } from '@prisma/client';
 
+import {
+  AppointmentAvailabilityService,
+} from '../availability/appointment-availability.service';
 import { PrismaService } from '../database/prisma.service';
+import {
+  OUTBOX_DELETE_EVENT,
+  OUTBOX_UPDATE_EVENT,
+} from '../sync/sync.constants';
 import {
   decodeAppointmentCursor,
   encodeAppointmentCursor,
@@ -15,7 +23,9 @@ import {
 import {
   ADMIN_APPOINTMENT_STATUSES,
   type AdminAppointmentStatusFilter,
+  type AppointmentActionDto,
   type ListAdminAppointmentsDto,
+  type RescheduleAdminAppointmentDto,
 } from './admin-appointments.dto';
 
 const PAGE_SIZE = 20;
@@ -31,7 +41,34 @@ const notFound = (): NotFoundException =>
 
 const serviceUnavailable = (): ServiceUnavailableException =>
   new ServiceUnavailableException(
-    safeError('SERVICE_UNAVAILABLE', 'No fue posible consultar las citas'),
+    safeError('SERVICE_UNAVAILABLE', 'No fue posible actualizar la cita'),
+  );
+
+const badRequest = (message: string): BadRequestException =>
+  new BadRequestException(safeError('BAD_REQUEST', message));
+
+const stateConflict = (): ConflictException =>
+  new ConflictException(
+    safeError(
+      'APPOINTMENT_STATE_CONFLICT',
+      'La cita no permite esta transición de estado',
+    ),
+  );
+
+const versionConflict = (): ConflictException =>
+  new ConflictException(
+    safeError(
+      'APPOINTMENT_VERSION_CONFLICT',
+      'La cita cambió desde la última lectura',
+    ),
+  );
+
+const slotUnavailable = (): ConflictException =>
+  new ConflictException(
+    safeError(
+      'SLOT_UNAVAILABLE',
+      'El horario seleccionado ya no está disponible',
+    ),
   );
 
 type AppointmentListRow = Prisma.AppointmentGetPayload<{
@@ -91,6 +128,32 @@ type AuditRow = {
   changes: Prisma.JsonValue | null;
 };
 
+type RescheduleAppointmentRow = Prisma.AppointmentGetPayload<{
+  select: {
+    id: true;
+    artistId: true;
+    startAt: true;
+    endAt: true;
+    status: true;
+    version: true;
+    request: {
+      select: {
+        durationMinutes: true;
+        minDate: true;
+        maxDate: true;
+        allowedWeekdays: true;
+        allowedWindows: true;
+      };
+    };
+  };
+}>;
+
+type TransitionAppointmentRow = {
+  id: string;
+  status: AppointmentStatus;
+  version: number;
+};
+
 export type AdminAppointmentListItem = {
   id: string;
   status: Lowercase<AppointmentStatus>;
@@ -133,7 +196,10 @@ export type AdminAppointmentDetail = {
 
 @Injectable()
 export class AdminAppointmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly availability: AppointmentAvailabilityService,
+  ) {}
 
   async list(
     artistId: string,
@@ -257,6 +323,324 @@ export class AdminAppointmentsService {
     } catch (error) {
       this.rethrowHttp(error);
     }
+  }
+
+  async reschedule(
+    artistId: string,
+    id: string,
+    dto: RescheduleAdminAppointmentDto,
+  ): Promise<AdminAppointmentDetail> {
+    const appointmentId = this.assertAppointmentId(id);
+    const startAt = this.normalizeStartAt(dto.startAt);
+    this.assertVersion(dto.version);
+
+    let current: RescheduleAppointmentRow | null;
+    try {
+      current = await this.prisma.appointment.findFirst({
+        where: { id: appointmentId, artistId },
+        select: {
+          id: true,
+          artistId: true,
+          startAt: true,
+          endAt: true,
+          status: true,
+          version: true,
+          request: {
+            select: {
+              durationMinutes: true,
+              minDate: true,
+              maxDate: true,
+              allowedWeekdays: true,
+              allowedWindows: true,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      this.rethrowHttp(error);
+    }
+
+    if (!current) throw notFound();
+    if (current.status !== AppointmentStatus.CONFIRMED) {
+      throw stateConflict();
+    }
+
+    const endAt = new Date(
+      startAt.getTime() + current.request.durationMinutes * 60_000,
+    );
+    const sameInterval =
+      current.startAt.getTime() === startAt.getTime() &&
+      current.endAt.getTime() === endAt.getTime();
+    if (sameInterval) {
+      return this.detail(artistId, appointmentId);
+    }
+    if (current.version !== dto.version) {
+      throw versionConflict();
+    }
+
+    await this.availability.assertAvailable({
+      artistId,
+      appointmentId,
+      startAt,
+      durationMinutes: current.request.durationMinutes,
+      request: {
+        minDate: current.request.minDate,
+        maxDate: current.request.maxDate,
+        allowedWeekdays: current.request.allowedWeekdays,
+        allowedWindows: current.request.allowedWindows,
+      },
+    });
+
+    await this.serializable(async (transaction) => {
+      await this.lockAppointment(transaction, artistId, appointmentId);
+      const latest = await transaction.appointment.findFirst({
+        where: { id: appointmentId, artistId },
+        select: { id: true, status: true, version: true, startAt: true, endAt: true },
+      });
+      if (!latest) throw notFound();
+      if (latest.status !== AppointmentStatus.CONFIRMED) {
+        throw stateConflict();
+      }
+
+      const latestSameInterval =
+        latest.startAt.getTime() === startAt.getTime() &&
+        latest.endAt.getTime() === endAt.getTime();
+      if (latestSameInterval) return;
+      if (latest.version !== dto.version) {
+        throw versionConflict();
+      }
+
+      await transaction.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          startAt,
+          endAt,
+          version: { increment: 1 },
+          syncStatus: SyncStatus.PENDING,
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorType: 'ADMIN',
+          actorId: artistId,
+          entityType: 'appointment',
+          entityId: appointmentId,
+          action: 'rescheduled',
+          changes: {
+            from: {
+              startAt: latest.startAt.toISOString(),
+              endAt: latest.endAt.toISOString(),
+            },
+            to: { startAt: startAt.toISOString(), endAt: endAt.toISOString() },
+          },
+        },
+      });
+      await transaction.outboxEvent.create({
+        data: {
+          aggregateId: appointmentId,
+          type: OUTBOX_UPDATE_EVENT,
+          payload: { appointmentId, operation: 'update' },
+        },
+      });
+    });
+
+    return this.detail(artistId, appointmentId);
+  }
+
+  async cancel(
+    artistId: string,
+    id: string,
+    dto: AppointmentActionDto,
+  ): Promise<AdminAppointmentDetail> {
+    return this.transition(
+      artistId,
+      id,
+      dto,
+      AppointmentStatus.CANCELLED,
+      OUTBOX_DELETE_EVENT,
+    );
+  }
+
+  async complete(
+    artistId: string,
+    id: string,
+    dto: AppointmentActionDto,
+  ): Promise<AdminAppointmentDetail> {
+    return this.transition(
+      artistId,
+      id,
+      dto,
+      AppointmentStatus.COMPLETED,
+    );
+  }
+
+  async noShow(
+    artistId: string,
+    id: string,
+    dto: AppointmentActionDto,
+  ): Promise<AdminAppointmentDetail> {
+    return this.transition(
+      artistId,
+      id,
+      dto,
+      AppointmentStatus.NO_SHOW,
+    );
+  }
+
+  private async transition(
+    artistId: string,
+    id: string,
+    dto: AppointmentActionDto,
+    target: AppointmentStatus,
+    outboxType?: typeof OUTBOX_DELETE_EVENT,
+  ): Promise<AdminAppointmentDetail> {
+    const appointmentId = this.assertAppointmentId(id);
+    this.assertVersion(dto.version);
+
+    await this.serializable(async (transaction) => {
+      await this.lockAppointment(transaction, artistId, appointmentId);
+      const current = (await transaction.appointment.findFirst({
+        where: { id: appointmentId, artistId },
+        select: { id: true, status: true, version: true },
+      })) as TransitionAppointmentRow | null;
+      if (!current) throw notFound();
+
+      if (current.status === target) return;
+      if (current.status !== AppointmentStatus.CONFIRMED) {
+        throw stateConflict();
+      }
+      if (current.version !== dto.version) {
+        throw versionConflict();
+      }
+
+      await transaction.appointment.update({
+        where: { id: appointmentId },
+        data: {
+          status: target,
+          version: { increment: 1 },
+          ...(target === AppointmentStatus.CANCELLED
+            ? { syncStatus: SyncStatus.PENDING }
+            : {}),
+        },
+      });
+      await transaction.auditLog.create({
+        data: {
+          actorType: 'ADMIN',
+          actorId: artistId,
+          entityType: 'appointment',
+          entityId: appointmentId,
+          action: target.toLowerCase(),
+          changes: {
+            from: { status: current.status.toLowerCase() },
+            to: { status: target.toLowerCase() },
+          },
+        },
+      });
+      if (outboxType) {
+        await transaction.outboxEvent.create({
+          data: {
+            aggregateId: appointmentId,
+            type: outboxType,
+            payload: { appointmentId, operation: 'delete' },
+          },
+        });
+      }
+    });
+
+    return this.detail(artistId, appointmentId);
+  }
+
+  private async lockAppointment(
+    transaction: Prisma.TransactionClient,
+    artistId: string,
+    appointmentId: string,
+  ): Promise<void> {
+    await transaction.$queryRaw(
+      Prisma.sql`SELECT id FROM "appointments" WHERE id = CAST(${appointmentId} AS uuid) AND artist_id = CAST(${artistId} AS uuid) FOR UPDATE`,
+    );
+  }
+
+  private assertAppointmentId(id: string): string {
+    if (typeof id !== 'string' || !UUID_PATTERN.test(id)) {
+      throw notFound();
+    }
+    return id;
+  }
+
+  private normalizeStartAt(value: unknown): Date {
+    if (
+      typeof value !== 'string' ||
+      !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value)
+    ) {
+      throw badRequest('La fecha de inicio debe estar en UTC');
+    }
+    const startAt = new Date(value);
+    if (!Number.isFinite(startAt.getTime()) || startAt.toISOString() !== value) {
+      throw badRequest('La fecha de inicio no es válida');
+    }
+    return startAt;
+  }
+
+  private assertVersion(value: unknown): asserts value is number {
+    if (!Number.isInteger(value) || (value as number) < 1) {
+      throw badRequest('La versión de la cita no es válida');
+    }
+  }
+
+  private async serializable<T>(
+    operation: (transaction: Prisma.TransactionClient) => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await this.prisma.$transaction(operation, {
+          isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+        });
+      } catch (error) {
+        if (this.isSerializationConflict(error) && attempt < 2) continue;
+        if (this.isExclusionConflict(error)) throw slotUnavailable();
+        this.rethrowHttp(error);
+      }
+    }
+    throw serviceUnavailable();
+  }
+
+  private isSerializationConflict(error: unknown): boolean {
+    return this.hasDatabaseCode(error, ['P2034', '40001', '40P01']);
+  }
+
+  private isExclusionConflict(error: unknown): boolean {
+    return this.hasDatabaseCode(error, ['23P01']);
+  }
+
+  private hasDatabaseCode(
+    error: unknown,
+    expected: readonly string[],
+  ): boolean {
+    let current: unknown = error;
+    for (let depth = 0; depth < 4 && current; depth += 1) {
+      if (typeof current !== 'object') return false;
+      const record = current as Record<string, unknown>;
+      for (const key of ['code', 'sqlState']) {
+        if (
+          typeof record[key] === 'string' &&
+          expected.includes(record[key] as string)
+        ) {
+          return true;
+        }
+      }
+      if (typeof record.meta === 'object' && record.meta !== null) {
+        const meta = record.meta as Record<string, unknown>;
+        if (
+          (typeof meta.code === 'string' && expected.includes(meta.code)) ||
+          (typeof meta.sqlState === 'string' &&
+            expected.includes(meta.sqlState))
+        ) {
+          return true;
+        }
+      }
+      current = record.cause;
+    }
+    return false;
   }
 
   private statusFromFilter(

@@ -1,4 +1,12 @@
-import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export const ADMIN_APPOINTMENT_STATUSES = [
   'confirmed',
@@ -19,4 +27,23 @@ export class ListAdminAppointmentsDto {
   @IsString()
   @MaxLength(256)
   cursor?: string;
+}
+
+export const UTC_DATETIME_WITH_MILLISECONDS_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+export class RescheduleAdminAppointmentDto {
+  @IsString()
+  @Matches(UTC_DATETIME_WITH_MILLISECONDS_PATTERN)
+  startAt!: string;
+
+  @IsInt()
+  @Min(1)
+  version!: number;
+}
+
+export class AppointmentActionDto {
+  @IsInt()
+  @Min(1)
+  version!: number;
 }
