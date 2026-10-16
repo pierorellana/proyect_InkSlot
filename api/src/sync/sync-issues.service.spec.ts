@@ -1,4 +1,11 @@
 import {
+  INestApplication,
+  UnauthorizedException,
+  ValidationPipe,
+} from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import request from 'supertest';
+import {
   CalendarConnectionStatus,
   OutboxStatus,
   SyncIssueStatus,
@@ -6,7 +13,11 @@ import {
 } from '@prisma/client';
 
 import { PrismaService } from '../database/prisma.service';
+import { AdminSessionGuard } from '../auth/admin-session.guard';
+import { AuthService } from '../auth/auth.service';
 import type { CalendarSyncSuccess } from './calendar-sync.service';
+import { SyncIssuesController } from './sync-issues.controller';
+import { ListSyncIssuesDto } from './sync-issues.dto';
 import { SyncIssuesService } from './sync-issues.service';
 import {
   OUTBOX_CREATE_EVENT,
@@ -45,7 +56,10 @@ describe('SyncIssuesService', () => {
   };
 
   let transaction: Record<string, Record<string, jest.Mock>>;
-  let prisma: { $transaction: jest.Mock };
+  let prisma: {
+    $transaction: jest.Mock;
+    syncIssue: { findMany: jest.Mock };
+  };
   let service: SyncIssuesService;
 
   beforeEach(() => {
@@ -59,7 +73,10 @@ describe('SyncIssuesService', () => {
         findUnique: jest.fn().mockResolvedValue({ artistId }),
         update: jest.fn(),
       },
-      outboxEvent: { update: jest.fn() },
+      outboxEvent: {
+        findFirst: jest.fn().mockResolvedValue({ id: outboxId }),
+        update: jest.fn(),
+      },
       syncIssue: {
         findFirst: jest.fn().mockResolvedValue(null),
         create: jest.fn(),
@@ -68,7 +85,10 @@ describe('SyncIssuesService', () => {
       },
       calendarConnection: { updateMany: jest.fn() },
     };
-    prisma = { $transaction: jest.fn() };
+    prisma = {
+      $transaction: jest.fn(),
+      syncIssue: { findMany: jest.fn() },
+    };
     prisma.$transaction.mockImplementation(async (callback) =>
       callback(transaction),
     );
@@ -80,6 +100,152 @@ describe('SyncIssuesService', () => {
 
   afterEach(() => {
     jest.useRealTimers();
+  });
+
+  it('lists only scoped open issues with safe fields, bounded ordering, and a default status', async () => {
+    const firstCreatedAt = new Date('2026-10-01T10:00:00.000Z');
+    const secondCreatedAt = new Date('2026-10-02T10:00:00.000Z');
+    const lastAttemptAt = new Date('2026-10-16T11:00:00.000Z');
+    const query = new ListSyncIssuesDto();
+    const findMany = (prisma.syncIssue.findMany as jest.Mock).mockResolvedValue(
+      [
+        {
+          id: 'issue-1',
+          appointmentId,
+          operation: OUTBOX_CREATE_EVENT,
+          code: 'CALENDAR_UNAVAILABLE',
+          messageSafe: 'Mensaje seguro',
+          status: SyncIssueStatus.OPEN,
+          lastAttemptAt,
+          appointment: { createdAt: firstCreatedAt },
+        },
+        {
+          id: 'issue-2',
+          appointmentId: '66666666-6666-4666-8666-666666666666',
+          operation: OUTBOX_CREATE_EVENT,
+          code: 'CALENDAR_REAUTH_REQUIRED',
+          messageSafe: 'Reconecta Calendar',
+          status: SyncIssueStatus.OPEN,
+          lastAttemptAt: null,
+          appointment: { createdAt: secondCreatedAt },
+        },
+      ],
+    );
+
+    await expect(service.list(artistId, query)).resolves.toEqual({
+      items: [
+        {
+          id: 'issue-1',
+          appointmentId,
+          operation: OUTBOX_CREATE_EVENT,
+          code: 'CALENDAR_UNAVAILABLE',
+          message: 'Mensaje seguro',
+          status: 'open',
+          lastAttemptAt: lastAttemptAt.toISOString(),
+          createdAt: firstCreatedAt.toISOString(),
+        },
+        {
+          id: 'issue-2',
+          appointmentId: '66666666-6666-4666-8666-666666666666',
+          operation: OUTBOX_CREATE_EVENT,
+          code: 'CALENDAR_REAUTH_REQUIRED',
+          message: 'Reconecta Calendar',
+          status: 'open',
+          lastAttemptAt: null,
+          createdAt: secondCreatedAt.toISOString(),
+        },
+      ],
+    });
+
+    expect(findMany).toHaveBeenCalledWith({
+      where: {
+        operation: OUTBOX_CREATE_EVENT,
+        status: SyncIssueStatus.OPEN,
+        appointment: { artistId },
+      },
+      orderBy: [
+        { lastAttemptAt: { sort: 'desc', nulls: 'last' } },
+        { appointment: { createdAt: 'desc' } },
+      ],
+      take: 50,
+      select: {
+        id: true,
+        appointmentId: true,
+        operation: true,
+        code: true,
+        messageSafe: true,
+        status: true,
+        lastAttemptAt: true,
+        appointment: { select: { createdAt: true } },
+      },
+    });
+    expect(JSON.stringify(findMany.mock.calls)).not.toContain('payment');
+    expect(JSON.stringify(findMany.mock.calls)).not.toContain('token');
+  });
+
+  it('filters resolved issues when explicitly requested and keeps the response bounded to 50', async () => {
+    const resolved = new ListSyncIssuesDto();
+    resolved.status = 'resolved';
+    (prisma.syncIssue.findMany as jest.Mock).mockResolvedValue([]);
+
+    await service.list(artistId, resolved);
+
+    expect(prisma.syncIssue.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: SyncIssueStatus.RESOLVED }),
+        take: 50,
+      }),
+    );
+  });
+
+  it('rejects a foreign issue without changing its outbox or appointment', async () => {
+    transaction.syncIssue.findFirst.mockResolvedValue(null);
+
+    await expect(
+      service.retry(artistId, 'foreign-issue'),
+    ).rejects.toMatchObject({
+      response: {
+        error: { code: 'NOT_FOUND', message: 'Incidencia no encontrada' },
+      },
+    });
+    expect(transaction.outboxEvent.update).not.toHaveBeenCalled();
+    expect(transaction.appointment.update).not.toHaveBeenCalled();
+  });
+
+  it('requeues the owner outbox and is idempotent when retried again', async () => {
+    transaction.syncIssue.findFirst.mockResolvedValue({ appointmentId });
+
+    await expect(service.retry(artistId, 'issue-1')).resolves.toEqual({
+      status: 'queued',
+    });
+    await expect(service.retry(artistId, 'issue-1')).resolves.toEqual({
+      status: 'queued',
+    });
+
+    expect(transaction.syncIssue.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: 'issue-1',
+        operation: OUTBOX_CREATE_EVENT,
+        status: SyncIssueStatus.OPEN,
+        appointment: { artistId },
+      },
+      select: { appointmentId: true },
+    });
+    expect(transaction.outboxEvent.findFirst).toHaveBeenCalledWith({
+      where: { aggregateId: appointmentId, type: OUTBOX_CREATE_EVENT },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    expect(transaction.outboxEvent.update).toHaveBeenCalledTimes(2);
+    expect(transaction.outboxEvent.update).toHaveBeenCalledWith({
+      where: { id: outboxId },
+      data: {
+        status: OutboxStatus.PENDING,
+        attempts: 0,
+        nextAttemptAt: now,
+      },
+    });
+    expect(transaction.appointment.update).toHaveBeenCalledTimes(2);
   });
 
   it('persists every success transition in one transaction', async () => {
@@ -289,5 +455,54 @@ describe('SyncIssuesService', () => {
         messageSafe: 'No fue posible sincronizar el evento con Google Calendar',
       }),
     });
+  });
+});
+
+describe('SyncIssuesController', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const moduleRef = await Test.createTestingModule({
+      controllers: [SyncIssuesController],
+      providers: [
+        AdminSessionGuard,
+        {
+          provide: AuthService,
+          useValue: {
+            me: jest.fn().mockRejectedValue(
+              new UnauthorizedException({
+                error: {
+                  code: 'AUTH_INVALID',
+                  message: 'Credenciales inválidas',
+                },
+              }),
+            ),
+          },
+        },
+        {
+          provide: SyncIssuesService,
+          useValue: { list: jest.fn(), retry: jest.fn() },
+        },
+      ],
+    }).compile();
+
+    app = moduleRef.createNestApplication();
+    app.setGlobalPrefix('v1');
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+        whitelist: true,
+        forbidNonWhitelisted: true,
+      }),
+    );
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('rejects unauthenticated access with 401', async () => {
+    await request(app.getHttpServer()).get('/v1/admin/sync-issues').expect(401);
   });
 });

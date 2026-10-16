@@ -17,9 +17,11 @@ import {
 } from './sync.constants';
 import { readSyncConfig } from './sync.config';
 import { SyncIssuesService } from './sync-issues.service';
+import { SyncIssuesController } from './sync-issues.controller';
 
 @Module({
   imports: [ScheduleModule.forRoot(), PrismaModule, CalendarModule, AuthModule],
+  controllers: [SyncIssuesController],
   providers: [
     {
       provide: SYNC_CONFIG,

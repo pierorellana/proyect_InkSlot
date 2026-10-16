@@ -1,4 +1,9 @@
-import { Inject, Injectable, Optional } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import {
   CalendarConnectionStatus,
   OutboxStatus,
@@ -9,6 +14,7 @@ import {
 
 import { PrismaService } from '../database/prisma.service';
 import { OUTBOX_CREATE_EVENT, SYNC_RANDOM } from './sync.constants';
+import { ListSyncIssuesDto } from './sync-issues.dto';
 import type { CalendarSyncSuccess } from './calendar-sync.service';
 import type {
   ClaimedOutboxEvent,
@@ -35,6 +41,109 @@ export class SyncIssuesService {
     @Inject(SYNC_RANDOM)
     private readonly random?: () => number,
   ) {}
+
+  async list(
+    artistId: string,
+    query: ListSyncIssuesDto,
+  ): Promise<{
+    items: Array<{
+      id: string;
+      appointmentId: string;
+      operation: string;
+      code: string;
+      message: string;
+      status: 'open' | 'resolved';
+      lastAttemptAt: string | null;
+      createdAt: string;
+    }>;
+  }> {
+    const status = query.status ?? 'open';
+    const issues = await this.prisma.syncIssue.findMany({
+      where: {
+        operation: OUTBOX_CREATE_EVENT,
+        status:
+          status === 'open' ? SyncIssueStatus.OPEN : SyncIssueStatus.RESOLVED,
+        appointment: { artistId },
+      },
+      orderBy: [
+        { lastAttemptAt: { sort: 'desc', nulls: 'last' } },
+        { appointment: { createdAt: 'desc' } },
+      ],
+      take: 50,
+      select: {
+        id: true,
+        appointmentId: true,
+        operation: true,
+        code: true,
+        messageSafe: true,
+        status: true,
+        lastAttemptAt: true,
+        appointment: { select: { createdAt: true } },
+      },
+    });
+
+    return {
+      items: issues.map((issue) => ({
+        id: issue.id,
+        appointmentId: issue.appointmentId,
+        operation: issue.operation,
+        code: issue.code,
+        message: issue.messageSafe,
+        status: issue.status.toLowerCase() as 'open' | 'resolved',
+        lastAttemptAt: issue.lastAttemptAt?.toISOString() ?? null,
+        createdAt: issue.appointment.createdAt.toISOString(),
+      })),
+    };
+  }
+
+  async retry(
+    artistId: string,
+    issueId: string,
+  ): Promise<{ status: 'queued' }> {
+    return this.prisma.$transaction(async (transaction) => {
+      const issue = await transaction.syncIssue.findFirst({
+        where: {
+          id: issueId,
+          operation: OUTBOX_CREATE_EVENT,
+          status: SyncIssueStatus.OPEN,
+          appointment: { artistId },
+        },
+        select: { appointmentId: true },
+      });
+
+      if (!issue) {
+        throw this.syncIssueNotFound();
+      }
+
+      const outbox = await transaction.outboxEvent.findFirst({
+        where: {
+          aggregateId: issue.appointmentId,
+          type: OUTBOX_CREATE_EVENT,
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+
+      if (!outbox) {
+        throw this.syncIssueNotFound();
+      }
+
+      await transaction.outboxEvent.update({
+        where: { id: outbox.id },
+        data: {
+          status: OutboxStatus.PENDING,
+          attempts: 0,
+          nextAttemptAt: new Date(),
+        },
+      });
+      await transaction.appointment.update({
+        where: { id: issue.appointmentId },
+        data: { syncStatus: SyncStatus.PENDING },
+      });
+
+      return { status: 'queued' as const };
+    });
+  }
 
   async finalizeSuccess(
     outboxId: string,
@@ -228,5 +337,11 @@ export class SyncIssuesService {
       current = record.cause;
     }
     return false;
+  }
+
+  private syncIssueNotFound(): NotFoundException {
+    return new NotFoundException({
+      error: { code: 'NOT_FOUND', message: 'Incidencia no encontrada' },
+    });
   }
 }
