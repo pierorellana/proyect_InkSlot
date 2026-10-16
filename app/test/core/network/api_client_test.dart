@@ -51,6 +51,28 @@ void main() {
     );
   });
 
+  test('merges optional headers into JSON requests', () async {
+    final client = RecordingHttpClient((request) async {
+      expect(request.headers['accept'], 'application/json');
+      expect(request.headers['content-type'], 'application/json');
+      expect(request.headers['idempotency-key'], 'key-in-memory');
+      return http.Response('{"status":"ok"}', 200);
+    });
+    final api = HttpApiClient(
+      client: client,
+      baseUri: Uri.parse('http://localhost:3000/v1'),
+    );
+
+    expect(
+      await api.postJson(
+        '/public/reservations/token/confirm',
+        body: <String, dynamic>{'startAt': '2026-10-20T15:00:00.000Z'},
+        headers: <String, String>{'Idempotency-Key': 'key-in-memory'},
+      ),
+      <String, dynamic>{'status': 'ok'},
+    );
+  });
+
   test(
     'maps the safe API error envelope without exposing raw failures',
     () async {

@@ -1,5 +1,7 @@
 import '../../../core/network/api_client.dart';
 import '../domain/public_availability.dart';
+import '../domain/public_appointment.dart';
+import '../domain/public_confirmation.dart';
 import '../domain/public_reservation.dart';
 
 class PublicReservationRepository {
@@ -32,6 +34,34 @@ class PublicReservationRepository {
     ).toString();
     final response = await _apiClient.getJson(path);
     return PublicAvailability.fromJson(response);
+  }
+
+  Future<PublicConfirmation> confirmReservation(
+    String token,
+    DateTime startAt, {
+    required String idempotencyKey,
+  }) async {
+    _validateToken(token);
+    if (!startAt.isUtc) {
+      throw const FormatException('El horario debe ser un instante UTC.');
+    }
+    if (idempotencyKey.trim().isEmpty || idempotencyKey.length > 128) {
+      throw const FormatException('La clave de confirmación no es válida.');
+    }
+    final response = await _apiClient.postJson(
+      '/public/reservations/${_segment(token)}/confirm',
+      body: <String, dynamic>{'startAt': startAt.toUtc().toIso8601String()},
+      headers: <String, String>{'Idempotency-Key': idempotencyKey},
+    );
+    return PublicConfirmation.fromJson(response);
+  }
+
+  Future<PublicAppointment> getAppointment(String token) async {
+    _validateToken(token);
+    final response = await _apiClient.getJson(
+      '/public/reservations/${_segment(token)}/appointment',
+    );
+    return PublicAppointment.fromJson(response);
   }
 
   void _validateToken(String token) {

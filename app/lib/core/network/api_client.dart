@@ -12,6 +12,7 @@ abstract class ApiClient {
   Future<Map<String, dynamic>> postJson(
     String path, {
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
   });
 }
 
@@ -31,7 +32,8 @@ class HttpApiClient implements ApiClient {
   Future<Map<String, dynamic>> postJson(
     String path, {
     Map<String, dynamic>? body,
-  }) => _request(method: 'POST', path: path, body: body);
+    Map<String, String>? headers,
+  }) => _request(method: 'POST', path: path, body: body, headers: headers);
 
   void close() => _client.close();
 
@@ -39,6 +41,7 @@ class HttpApiClient implements ApiClient {
     required String method,
     required String path,
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
   }) async {
     final request = http.Request(method, _buildUri(path));
     request.headers['accept'] = 'application/json';
@@ -46,6 +49,7 @@ class HttpApiClient implements ApiClient {
       request.headers['content-type'] = 'application/json';
       request.body = jsonEncode(body);
     }
+    if (headers != null) request.headers.addAll(headers);
 
     final http.StreamedResponse streamedResponse;
     try {

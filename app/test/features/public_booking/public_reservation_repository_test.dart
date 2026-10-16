@@ -44,6 +44,50 @@ void main() {
     expect(reservation.isBooked, isTrue);
     expect(api.path, '/public/reservations/safe-token');
   });
+
+  test(
+    'confirms a reservation with UTC payload and idempotency header',
+    () async {
+      final api = RecordingApiClient(<String, dynamic>{
+        'status': 'confirmed',
+        'syncStatus': 'pending',
+        'startAt': '2026-10-20T15:00:00.000Z',
+        'endAt': '2026-10-20T18:00:00.000Z',
+        'timezone': 'America/Guayaquil',
+      });
+
+      final confirmation = await PublicReservationRepository(api)
+          .confirmReservation(
+            'safe-token',
+            DateTime.utc(2026, 10, 20, 15),
+            idempotencyKey: 'key-in-memory',
+          );
+
+      expect(confirmation.syncStatus, 'pending');
+      expect(api.path, '/public/reservations/safe-token/confirm');
+      expect(api.body, <String, dynamic>{
+        'startAt': '2026-10-20T15:00:00.000Z',
+      });
+      expect(api.headers, <String, String>{'Idempotency-Key': 'key-in-memory'});
+    },
+  );
+
+  test('loads the safe appointment lookup response', () async {
+    final api = RecordingApiClient(<String, dynamic>{
+      'status': 'confirmed',
+      'syncStatus': 'synced',
+      'startAt': '2026-10-20T15:00:00.000Z',
+      'endAt': '2026-10-20T18:00:00.000Z',
+      'timezone': 'America/Guayaquil',
+    });
+
+    final appointment = await PublicReservationRepository(
+      api,
+    ).getAppointment('token/with spaces');
+
+    expect(appointment.status, 'confirmed');
+    expect(api.path, '/public/reservations/token%2Fwith%20spaces/appointment');
+  });
 }
 
 class RecordingApiClient implements ApiClient {
@@ -51,6 +95,8 @@ class RecordingApiClient implements ApiClient {
 
   final Map<String, dynamic> response;
   String? path;
+  Map<String, dynamic>? body;
+  Map<String, String>? headers;
 
   @override
   Future<Map<String, dynamic>> getJson(String path) async {
@@ -62,5 +108,11 @@ class RecordingApiClient implements ApiClient {
   Future<Map<String, dynamic>> postJson(
     String path, {
     Map<String, dynamic>? body,
-  }) async => response;
+    Map<String, String>? headers,
+  }) async {
+    this.body = body;
+    this.headers = headers;
+    this.path = path;
+    return response;
+  }
 }

@@ -130,6 +130,7 @@ class _NoopApiClient implements ApiClient {
   Future<Map<String, dynamic>> postJson(
     String path, {
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
   }) async => <String, dynamic>{};
 }
 
