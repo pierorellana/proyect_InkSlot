@@ -11,6 +11,8 @@ import '../../features/public_booking/data/public_reservation_repository.dart';
 import '../../features/public_booking/presentation/public_entry_controller.dart';
 import '../../features/public_booking/presentation/public_dates_page.dart';
 import '../../features/public_booking/presentation/public_reservation_controller.dart';
+import '../../features/public_booking/presentation/public_result_page.dart';
+import '../../features/public_booking/presentation/public_review_page.dart';
 import '../../features/public_booking/presentation/public_splash_page.dart';
 import '../../features/public_booking/presentation/public_welcome_page.dart';
 import '../../features/requests/data/booking_requests_repository.dart';
@@ -29,8 +31,7 @@ abstract final class AppRouter {
     PublicReservationController? publicReservationController,
     ApiClient? apiClient,
   }) {
-    final session =
-        sessionController ?? _defaultSessionController(apiClient);
+    final session = sessionController ?? _defaultSessionController(apiClient);
     final requests =
         bookingRequestsController ??
         _defaultBookingRequestsController(session, apiClient);
@@ -62,8 +63,9 @@ abstract final class AppRouter {
             child: PublicWelcomePage(
               controller: publicReservation,
               token: state.pathParameters['token'] ?? '',
-              onChooseDate: () =>
-                  context.go('/r/${state.pathParameters['token'] ?? ''}/dates'),
+              onChooseDate: () => context.go(
+                _publicPath(state.pathParameters['token'] ?? '', 'dates'),
+              ),
             ),
           ),
         ),
@@ -74,6 +76,38 @@ abstract final class AppRouter {
             child: PublicDatesPage(
               controller: publicReservation,
               token: state.pathParameters['token'] ?? '',
+              onReview: () => context.go(
+                _publicPath(state.pathParameters['token'] ?? '', 'review'),
+              ),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/r/:token/review',
+          builder: (context, state) => ChangeNotifierProvider.value(
+            value: publicReservation,
+            child: PublicReviewPage(
+              controller: publicReservation,
+              token: state.pathParameters['token'] ?? '',
+              onBack: () => context.go(
+                _publicPath(state.pathParameters['token'] ?? '', 'dates'),
+              ),
+              onConfirmed: () => context.go(
+                _publicPath(state.pathParameters['token'] ?? '', 'result'),
+              ),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: '/r/:token/result',
+          builder: (context, state) => ChangeNotifierProvider.value(
+            value: publicReservation,
+            child: PublicResultPage(
+              controller: publicReservation,
+              token: state.pathParameters['token'] ?? '',
+              onReturnToDates: () => context.go(
+                _publicPath(state.pathParameters['token'] ?? '', 'dates'),
+              ),
             ),
           ),
         ),
@@ -145,8 +179,14 @@ abstract final class AppRouter {
     };
   }
 
-  static AdminSessionController _defaultSessionController(ApiClient? apiClient) =>
-      AdminSessionController(AuthRepository(apiClient ?? _UnavailableApiClient()));
+  static String _publicPath(String token, String page) =>
+      '/r/${Uri.encodeComponent(token)}/$page';
+
+  static AdminSessionController _defaultSessionController(
+    ApiClient? apiClient,
+  ) => AdminSessionController(
+    AuthRepository(apiClient ?? _UnavailableApiClient()),
+  );
 
   static BookingRequestsController _defaultBookingRequestsController(
     AdminSessionController session,
@@ -176,6 +216,7 @@ class _UnavailableApiClient implements ApiClient {
   Future<Map<String, dynamic>> postJson(
     String path, {
     Map<String, dynamic>? body,
+    Map<String, String>? headers,
   }) async {
     throw const ApiException(
       code: 'UNAVAILABLE',

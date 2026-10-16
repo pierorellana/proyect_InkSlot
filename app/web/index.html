@@ -47,6 +47,24 @@
         return new Date(timestamp).toISOString().slice(11, 16);
       }
     };
+    window.inkSlotFormatDate = function (timestamp, timezone) {
+      try {
+        return new Intl.DateTimeFormat('es-EC', {
+          timeZone: timezone,
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        }).format(new Date(timestamp));
+      } catch (_) {
+        return new Intl.DateTimeFormat('es-EC', {
+          weekday: 'long',
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric'
+        }).format(new Date(timestamp));
+      }
+    };
   </script>
   <!--
     You can customize the "flutter_bootstrap.js" script.

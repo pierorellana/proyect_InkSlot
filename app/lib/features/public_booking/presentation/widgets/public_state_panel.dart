@@ -12,6 +12,8 @@ enum PublicStateKind {
   calendarUnavailable,
   offline,
   empty,
+  conflict,
+  alreadyBooked,
   error,
 }
 
@@ -42,12 +44,16 @@ class PublicStatePanel extends StatelessWidget {
       PublicStateKind.calendarUnavailable => Icons.event_busy_rounded,
       PublicStateKind.offline => Icons.wifi_off_rounded,
       PublicStateKind.empty => Icons.calendar_today_rounded,
+      PublicStateKind.conflict => Icons.event_busy_rounded,
+      PublicStateKind.alreadyBooked => Icons.event_available_rounded,
       PublicStateKind.error => Icons.error_outline_rounded,
     };
     final accent = switch (kind) {
       PublicStateKind.loading => InkSlotColors.copper,
       PublicStateKind.empty => InkSlotColors.copper,
       PublicStateKind.booked => InkSlotColors.success,
+      PublicStateKind.alreadyBooked => InkSlotColors.success,
+      PublicStateKind.conflict => InkSlotColors.warning,
       PublicStateKind.error || PublicStateKind.offline => InkSlotColors.error,
       _ => InkSlotColors.warning,
     };

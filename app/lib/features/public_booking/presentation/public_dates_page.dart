@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_mono_label.dart';
+import '../../../core/widgets/inkslot_primary_button.dart';
 import '../domain/public_availability.dart';
 import '../domain/public_reservation.dart';
 import 'public_reservation_controller.dart';
@@ -15,10 +16,12 @@ class PublicDatesPage extends StatefulWidget {
     required this.token,
     required this.controller,
     super.key,
+    this.onReview,
   });
 
   final String token;
   final PublicReservationController controller;
+  final VoidCallback? onReview;
 
   @override
   State<PublicDatesPage> createState() => _PublicDatesPageState();
@@ -95,6 +98,7 @@ class _PublicDatesPageState extends State<PublicDatesPage> {
                     onPrevious: _goPrevious,
                     onNext: _goNext,
                     onSelectDate: widget.controller.selectDate,
+                    onReview: widget.onReview,
                   );
                 },
               ),
@@ -163,6 +167,7 @@ class _DatesContent extends StatelessWidget {
     required this.onPrevious,
     required this.onNext,
     required this.onSelectDate,
+    required this.onReview,
   });
 
   final PublicReservationController controller;
@@ -171,6 +176,7 @@ class _DatesContent extends StatelessWidget {
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final ValueChanged<DateTime> onSelectDate;
+  final VoidCallback? onReview;
 
   @override
   Widget build(BuildContext context) {
@@ -332,6 +338,14 @@ class _DatesContent extends StatelessWidget {
               slot: controller.selectedSlot!,
               timezone: availability.timezone,
             ),
+          if (controller.selectedSlot != null && onReview != null) ...[
+            const SizedBox(height: 16),
+            InkSlotPrimaryButton(
+              label: 'Revisar y confirmar',
+              onPressed: onReview,
+              trailing: const Icon(Icons.arrow_forward, size: 22),
+            ),
+          ],
         ],
       ],
     );
