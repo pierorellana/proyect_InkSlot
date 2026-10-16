@@ -4,9 +4,15 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../features/admin/presentation/admin_shell.dart';
+import '../../features/appointments/data/admin_appointments_repository.dart';
+import '../../features/appointments/presentation/admin_appointments_controller.dart';
+import '../../features/appointments/presentation/admin_appointments_page.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/admin_login_page.dart';
 import '../../features/auth/presentation/admin_session_controller.dart';
+import '../../features/dashboard/data/admin_dashboard_repository.dart';
+import '../../features/dashboard/presentation/admin_dashboard_controller.dart';
+import '../../features/dashboard/presentation/admin_dashboard_page.dart';
 import '../../features/public_booking/data/public_reservation_repository.dart';
 import '../../features/public_booking/presentation/public_entry_controller.dart';
 import '../../features/public_booking/presentation/public_dates_page.dart';
@@ -22,12 +28,18 @@ import '../../features/requests/presentation/booking_request_detail_page.dart';
 import '../../features/requests/presentation/booking_requests_page.dart';
 import '../../features/requests/presentation/link_ready_page.dart';
 import '../../features/requests/presentation/new_booking_request_page.dart';
+import '../../features/sync_issues/data/sync_issues_repository.dart';
+import '../../features/sync_issues/presentation/sync_issues_controller.dart';
+import '../../features/sync_issues/presentation/sync_issues_page.dart';
 
 abstract final class AppRouter {
   static GoRouter create({
     String initialLocation = '/',
     AdminSessionController? sessionController,
     BookingRequestsController? bookingRequestsController,
+    AdminDashboardController? dashboardController,
+    AdminAppointmentsController? appointmentsController,
+    SyncIssuesController? syncIssuesController,
     PublicReservationController? publicReservationController,
     ApiClient? apiClient,
   }) {
@@ -35,6 +47,14 @@ abstract final class AppRouter {
     final requests =
         bookingRequestsController ??
         _defaultBookingRequestsController(session, apiClient);
+    final dashboard =
+        dashboardController ?? _defaultDashboardController(session, apiClient);
+    final appointments =
+        appointmentsController ??
+        _defaultAppointmentsController(session, apiClient);
+    final syncIssues =
+        syncIssuesController ??
+        _defaultSyncIssuesController(session, apiClient);
     final publicReservation =
         publicReservationController ??
         _defaultPublicReservationController(apiClient);
@@ -118,11 +138,17 @@ abstract final class AppRouter {
             onAuthenticated: () => context.go('/admin/requests'),
           ),
         ),
-        GoRoute(path: '/admin', redirect: (_, _) => '/admin/requests'),
         ShellRoute(
           builder: (context, state, child) =>
               AdminShell(sessionController: session, child: child),
           routes: [
+            GoRoute(
+              path: '/admin',
+              builder: (_, _) => ChangeNotifierProvider.value(
+                value: dashboard,
+                child: AdminDashboardPage(controller: dashboard),
+              ),
+            ),
             GoRoute(
               path: '/admin/requests',
               builder: (_, _) => ChangeNotifierProvider.value(
@@ -154,6 +180,20 @@ abstract final class AppRouter {
                   controller: requests,
                   requestId: state.pathParameters['id'] ?? '',
                 ),
+              ),
+            ),
+            GoRoute(
+              path: '/admin/appointments',
+              builder: (_, _) => ChangeNotifierProvider.value(
+                value: appointments,
+                child: AdminAppointmentsPage(controller: appointments),
+              ),
+            ),
+            GoRoute(
+              path: '/admin/sync-issues',
+              builder: (_, _) => ChangeNotifierProvider.value(
+                value: syncIssues,
+                child: SyncIssuesPage(controller: syncIssues),
               ),
             ),
           ],
@@ -193,6 +233,30 @@ abstract final class AppRouter {
     ApiClient? apiClient,
   ) => BookingRequestsController(
     BookingRequestsRepository(apiClient ?? _UnavailableApiClient()),
+    sessionController: session,
+  );
+
+  static AdminDashboardController _defaultDashboardController(
+    AdminSessionController session,
+    ApiClient? apiClient,
+  ) => AdminDashboardController(
+    AdminDashboardRepository(apiClient ?? _UnavailableApiClient()),
+    sessionController: session,
+  );
+
+  static AdminAppointmentsController _defaultAppointmentsController(
+    AdminSessionController session,
+    ApiClient? apiClient,
+  ) => AdminAppointmentsController(
+    AdminAppointmentsRepository(apiClient ?? _UnavailableApiClient()),
+    sessionController: session,
+  );
+
+  static SyncIssuesController _defaultSyncIssuesController(
+    AdminSessionController session,
+    ApiClient? apiClient,
+  ) => SyncIssuesController(
+    SyncIssuesRepository(apiClient ?? _UnavailableApiClient()),
     sessionController: session,
   );
 

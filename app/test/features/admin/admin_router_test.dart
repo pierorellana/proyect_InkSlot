@@ -4,6 +4,10 @@ import 'package:inkslot_app/core/network/api_client.dart';
 import 'package:inkslot_app/core/network/api_exception.dart';
 import 'package:inkslot_app/core/router/app_router.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
+import 'package:inkslot_app/features/appointments/data/admin_appointments_repository.dart';
+import 'package:inkslot_app/features/appointments/domain/admin_appointment.dart';
+import 'package:inkslot_app/features/appointments/presentation/admin_appointments_controller.dart';
+import 'package:inkslot_app/features/appointments/presentation/admin_appointments_page.dart';
 import 'package:inkslot_app/features/admin/presentation/admin_shell.dart';
 import 'package:inkslot_app/features/auth/data/auth_repository.dart';
 import 'package:inkslot_app/features/auth/domain/admin_user.dart';
@@ -15,7 +19,14 @@ import 'package:inkslot_app/features/requests/domain/booking_request.dart';
 import 'package:inkslot_app/features/requests/domain/booking_request_status.dart';
 import 'package:inkslot_app/features/requests/presentation/booking_requests_controller.dart';
 import 'package:inkslot_app/features/requests/presentation/booking_request_detail_page.dart';
-import 'package:inkslot_app/features/requests/presentation/booking_requests_page.dart';
+import 'package:inkslot_app/features/dashboard/data/admin_dashboard_repository.dart';
+import 'package:inkslot_app/features/dashboard/domain/admin_dashboard.dart';
+import 'package:inkslot_app/features/dashboard/presentation/admin_dashboard_controller.dart';
+import 'package:inkslot_app/features/dashboard/presentation/admin_dashboard_page.dart';
+import 'package:inkslot_app/features/sync_issues/data/sync_issues_repository.dart';
+import 'package:inkslot_app/features/sync_issues/domain/sync_issue.dart';
+import 'package:inkslot_app/features/sync_issues/presentation/sync_issues_controller.dart';
+import 'package:inkslot_app/features/sync_issues/presentation/sync_issues_page.dart';
 
 void main() {
   testWidgets('redirects signed-out admin deep links to login', (tester) async {
@@ -35,32 +46,85 @@ void main() {
     expect(find.byType(AdminLoginPage), findsOneWidget);
   });
 
-  testWidgets('routes signed-in users from admin root to requests shell', (
+  testWidgets('routes signed-in users from admin root to dashboard shell', (
     tester,
   ) async {
     final session = AdminSessionController(FakeAuthRepository());
     await session.login('artist@example.com', 'password');
     final requests = EmptyBookingRequestsController();
+    final dashboard = AdminDashboardController(
+      FakeDashboardRepository(() async => _dashboard()),
+    );
     final router = AppRouter.create(
       initialLocation: '/admin',
       sessionController: session,
       bookingRequestsController: requests,
+      dashboardController: dashboard,
     );
     addTearDown(router.dispose);
     addTearDown(requests.dispose);
+    addTearDown(dashboard.dispose);
 
     await tester.pumpWidget(
       MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
     );
     await tester.pumpAndSettle();
 
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/admin');
+    expect(find.byType(AdminShell), findsOneWidget);
+    expect(find.byType(AdminDashboardPage), findsOneWidget);
+    expect(find.bySemanticsLabel('Inicio'), findsOneWidget);
+  });
+
+  testWidgets('navigates between admin destinations with stable controllers', (
+    tester,
+  ) async {
+    final session = AdminSessionController(FakeAuthRepository());
+    await session.login('artist@example.com', 'password');
+    final dashboard = AdminDashboardController(
+      FakeDashboardRepository(() async => _dashboard()),
+    );
+    final appointments = AdminAppointmentsController(
+      FakeAppointmentsRepository(),
+    );
+    final syncIssues = SyncIssuesController(FakeSyncIssuesRepository());
+    final router = AppRouter.create(
+      initialLocation: '/admin',
+      sessionController: session,
+      dashboardController: dashboard,
+      appointmentsController: appointments,
+      syncIssuesController: syncIssues,
+    );
+    addTearDown(router.dispose);
+    addTearDown(dashboard.dispose);
+    addTearDown(appointments.dispose);
+    addTearDown(syncIssues.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Citas'));
+    await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
-      '/admin/requests',
+      '/admin/appointments',
     );
-    expect(find.byType(AdminShell), findsOneWidget);
-    expect(find.byType(BookingRequestsPage), findsOneWidget);
-    expect(find.text('Solicitudes'), findsAtLeastNWidgets(1));
+    expect(find.byType(AdminAppointmentsPage), findsOneWidget);
+
+    await tester.tap(find.text('Incidencias'));
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/admin/sync-issues',
+    );
+    expect(find.byType(SyncIssuesPage), findsOneWidget);
+
+    await tester.tap(find.text('Inicio').last);
+    await tester.pumpAndSettle();
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/admin');
+    expect(find.byType(AdminDashboardPage), findsOneWidget);
   });
 
   testWidgets('keeps public deep links outside the admin guard', (
@@ -163,6 +227,34 @@ class FakeAuthRepository extends AuthRepository {
   }) async => const AdminUser(id: 'artist-1', name: 'Gio', role: 'admin');
 }
 
+class FakeDashboardRepository extends AdminDashboardRepository {
+  FakeDashboardRepository(this.handler) : super(_NoopApiClient());
+
+  final Future<AdminDashboard> Function() handler;
+
+  @override
+  Future<AdminDashboard> load() => handler();
+}
+
+class FakeAppointmentsRepository extends AdminAppointmentsRepository {
+  FakeAppointmentsRepository() : super(_NoopApiClient());
+
+  @override
+  Future<AdminAppointmentPage> list({
+    AdminAppointmentStatus status = AdminAppointmentStatus.confirmed,
+    String? cursor,
+  }) async => const AdminAppointmentPage(items: [], nextCursor: null);
+}
+
+class FakeSyncIssuesRepository extends SyncIssuesRepository {
+  FakeSyncIssuesRepository() : super(_NoopApiClient());
+
+  @override
+  Future<SyncIssueList> list({
+    SyncIssueStatus status = SyncIssueStatus.open,
+  }) async => const SyncIssueList(items: []);
+}
+
 class _NoopApiClient implements ApiClient {
   @override
   Future<Map<String, dynamic>> getJson(String path) async {
@@ -180,3 +272,20 @@ class _NoopApiClient implements ApiClient {
     Map<String, String>? headers,
   }) async => <String, dynamic>{};
 }
+
+AdminDashboard _dashboard() => AdminDashboard(
+  pendingRequests: 2,
+  upcomingAppointments: 1,
+  syncIssues: 0,
+  nextAppointments: [
+    DashboardAppointment(
+      id: 'appointment-a',
+      client: const DashboardClient(name: 'Cliente A'),
+      startAt: DateTime.utc(2026, 10, 20, 15),
+      endAt: DateTime.utc(2026, 10, 20, 18),
+      durationMinutes: 180,
+      status: 'confirmed',
+      syncStatus: 'synced',
+    ),
+  ],
+);

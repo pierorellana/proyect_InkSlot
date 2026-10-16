@@ -22,15 +22,15 @@ class AdminShell extends StatelessWidget {
     body: LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 860;
-        final isRequestsRoute = GoRouterState.of(
-          context,
-        ).uri.path.startsWith('/admin/requests');
+        final selectedDestination = _destinationFor(
+          GoRouterState.of(context).uri.path,
+        );
         return isDesktop
             ? Row(
                 children: [
                   _AdminRail(
                     sessionController: sessionController,
-                    requestsSelected: isRequestsRoute,
+                    selectedDestination: selectedDestination,
                   ),
                   Expanded(child: _AdminContent(child: child)),
                 ],
@@ -40,7 +40,7 @@ class AdminShell extends StatelessWidget {
                   Expanded(child: _AdminContent(child: child)),
                   _AdminBottomNavigation(
                     sessionController: sessionController,
-                    requestsSelected: isRequestsRoute,
+                    selectedDestination: selectedDestination,
                   ),
                 ],
               );
@@ -52,11 +52,11 @@ class AdminShell extends StatelessWidget {
 class _AdminRail extends StatelessWidget {
   const _AdminRail({
     required this.sessionController,
-    required this.requestsSelected,
+    required this.selectedDestination,
   });
 
   final AdminSessionController sessionController;
-  final bool requestsSelected;
+  final _AdminDestination selectedDestination;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -91,10 +91,28 @@ class _AdminRail extends StatelessWidget {
           const InkSlotMonoLabel('Espacio de trabajo'),
           const SizedBox(height: 12),
           _AdminNavItem(
+            label: 'Inicio',
+            icon: Icons.home_outlined,
+            selected: selectedDestination == _AdminDestination.dashboard,
+            onTap: () => context.go('/admin'),
+          ),
+          _AdminNavItem(
             label: 'Solicitudes',
             icon: Icons.inbox_outlined,
-            selected: requestsSelected,
+            selected: selectedDestination == _AdminDestination.requests,
             onTap: () => context.go('/admin/requests'),
+          ),
+          _AdminNavItem(
+            label: 'Citas',
+            icon: Icons.event_available_outlined,
+            selected: selectedDestination == _AdminDestination.appointments,
+            onTap: () => context.go('/admin/appointments'),
+          ),
+          _AdminNavItem(
+            label: 'Incidencias',
+            icon: Icons.sync_problem_outlined,
+            selected: selectedDestination == _AdminDestination.syncIssues,
+            onTap: () => context.go('/admin/sync-issues'),
           ),
           const Spacer(),
           _UserTile(sessionController: sessionController),
@@ -134,11 +152,11 @@ class _AdminContent extends StatelessWidget {
 class _AdminBottomNavigation extends StatelessWidget {
   const _AdminBottomNavigation({
     required this.sessionController,
-    required this.requestsSelected,
+    required this.selectedDestination,
   });
 
   final AdminSessionController sessionController;
-  final bool requestsSelected;
+  final _AdminDestination selectedDestination;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -154,11 +172,38 @@ class _AdminBottomNavigation extends StatelessWidget {
         children: [
           Expanded(
             child: _AdminNavItem(
+              label: 'Inicio',
+              icon: Icons.home_outlined,
+              selected: selectedDestination == _AdminDestination.dashboard,
+              compact: true,
+              onTap: () => context.go('/admin'),
+            ),
+          ),
+          Expanded(
+            child: _AdminNavItem(
               label: 'Solicitudes',
               icon: Icons.inbox_outlined,
-              selected: requestsSelected,
+              selected: selectedDestination == _AdminDestination.requests,
               compact: true,
               onTap: () => context.go('/admin/requests'),
+            ),
+          ),
+          Expanded(
+            child: _AdminNavItem(
+              label: 'Citas',
+              icon: Icons.event_available_outlined,
+              selected: selectedDestination == _AdminDestination.appointments,
+              compact: true,
+              onTap: () => context.go('/admin/appointments'),
+            ),
+          ),
+          Expanded(
+            child: _AdminNavItem(
+              label: 'Incidencias',
+              icon: Icons.sync_problem_outlined,
+              selected: selectedDestination == _AdminDestination.syncIssues,
+              compact: true,
+              onTap: () => context.go('/admin/sync-issues'),
             ),
           ),
           Expanded(
@@ -171,6 +216,19 @@ class _AdminBottomNavigation extends StatelessWidget {
       ),
     ),
   );
+}
+
+enum _AdminDestination { dashboard, requests, appointments, syncIssues }
+
+_AdminDestination _destinationFor(String path) {
+  if (path == '/admin') return _AdminDestination.dashboard;
+  if (path.startsWith('/admin/appointments')) {
+    return _AdminDestination.appointments;
+  }
+  if (path.startsWith('/admin/sync-issues')) {
+    return _AdminDestination.syncIssues;
+  }
+  return _AdminDestination.requests;
 }
 
 class _AdminNavItem extends StatelessWidget {
