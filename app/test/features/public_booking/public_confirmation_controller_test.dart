@@ -5,7 +5,6 @@ import 'package:inkslot_app/features/public_booking/data/public_reservation_repo
 import 'package:inkslot_app/features/public_booking/domain/public_appointment.dart';
 import 'package:inkslot_app/features/public_booking/domain/public_availability.dart';
 import 'package:inkslot_app/features/public_booking/domain/public_confirmation.dart';
-import 'package:inkslot_app/features/public_booking/domain/public_reservation.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_reservation_controller.dart';
 
 void main() {
@@ -86,10 +85,7 @@ PublicAvailability _availability(
 ]) => PublicAvailability(
   timezone: 'America/Guayaquil',
   days: <AvailabilityDay>[
-    AvailabilityDay(
-      date: _date,
-      slots: <AvailabilitySlot>[first, if (second != null) second],
-    ),
+    AvailabilityDay(date: _date, slots: <AvailabilitySlot>[first, ?second]),
   ],
 );
 
