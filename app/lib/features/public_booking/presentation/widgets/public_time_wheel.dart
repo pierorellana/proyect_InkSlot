@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 
 import '../../../../core/theme/inkslot_tokens.dart';
 import '../../domain/public_availability.dart';
+import 'public_time_zone_formatter.dart';
 
 class PublicTimeWheel extends StatefulWidget {
   const PublicTimeWheel({
@@ -274,20 +274,5 @@ int _indexFor(List<AvailabilitySlot> slots, AvailabilitySlot? target) {
 }
 
 String _formatSlotTime(DateTime utc, String timezone) {
-  final local = utc.toUtc().add(
-    Duration(minutes: _timezoneOffsetMinutes(timezone)),
-  );
-  return DateFormat('HH:mm').format(local);
+  return formatPublicTime(utc, timezone);
 }
-
-int _timezoneOffsetMinutes(String timezone) => switch (timezone) {
-  'UTC' || 'GMT' => 0,
-  'America/Guayaquil' || 'America/Lima' || 'America/Bogota' => -300,
-  'America/Los_Angeles' => -480,
-  'America/Denver' => -420,
-  'America/Chicago' => -360,
-  'America/New_York' => -300,
-  'Europe/London' => 0,
-  'Europe/Madrid' => 60,
-  _ => 0,
-};

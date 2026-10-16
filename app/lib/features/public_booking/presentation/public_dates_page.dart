@@ -8,6 +8,7 @@ import 'public_reservation_controller.dart';
 import 'widgets/public_calendar.dart';
 import 'widgets/public_state_panel.dart';
 import 'widgets/public_time_wheel.dart';
+import 'widgets/public_time_zone_formatter.dart';
 
 class PublicDatesPage extends StatefulWidget {
   const PublicDatesPage({
@@ -494,15 +495,5 @@ String _durationLabel(int minutes) {
 }
 
 String _formatTime(DateTime utc, String timezone) {
-  final offset = switch (timezone) {
-    'America/Guayaquil' || 'America/Lima' || 'America/Bogota' => -300,
-    'America/Los_Angeles' => -480,
-    'America/Denver' => -420,
-    'America/Chicago' => -360,
-    'America/New_York' => -300,
-    'Europe/Madrid' => 60,
-    _ => 0,
-  };
-  final local = utc.toUtc().add(Duration(minutes: offset));
-  return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  return formatPublicTime(utc, timezone);
 }
