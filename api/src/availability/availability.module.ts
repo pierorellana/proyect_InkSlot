@@ -8,6 +8,7 @@ import { AdminBlocksService } from './admin-blocks.service';
 import { AdminAvailabilityController } from './admin-availability.controller';
 import { AdminAvailabilityService } from './admin-availability.service';
 import { AvailabilityEngine } from './availability.engine';
+import { AppointmentAvailabilityService } from './appointment-availability.service';
 import { PublicAvailabilityController } from './public-availability.controller';
 import { PublicAvailabilityService } from './public-availability.service';
 
@@ -22,8 +23,13 @@ import { PublicAvailabilityService } from './public-availability.service';
     AdminAvailabilityService,
     AdminBlocksService,
     AvailabilityEngine,
+    AppointmentAvailabilityService,
     PublicAvailabilityService,
   ],
-  exports: [AvailabilityEngine, PublicAvailabilityService],
+  exports: [
+    AvailabilityEngine,
+    AppointmentAvailabilityService,
+    PublicAvailabilityService,
+  ],
 })
 export class AvailabilityModule {}
