@@ -49,6 +49,7 @@ describe('SyncIssuesService', () => {
     attempts: 1,
   };
   const success: CalendarSyncSuccess = {
+    operation: 'create',
     appointmentId,
     calendarId: 'inkslot-calendar',
     externalEventId: 'google-event-id',
@@ -67,6 +68,9 @@ describe('SyncIssuesService', () => {
     transaction = {
       calendarEvent: {
         create: jest.fn(),
+        upsert: jest.fn(),
+        update: jest.fn(),
+        deleteMany: jest.fn(),
         findUnique: jest.fn(),
       },
       appointment: {
@@ -159,7 +163,6 @@ describe('SyncIssuesService', () => {
 
     expect(findMany).toHaveBeenCalledWith({
       where: {
-        operation: OUTBOX_CREATE_EVENT,
         status: SyncIssueStatus.OPEN,
         appointment: { artistId },
       },
@@ -213,7 +216,10 @@ describe('SyncIssuesService', () => {
   });
 
   it('requeues the owner outbox and is idempotent when retried again', async () => {
-    transaction.syncIssue.findFirst.mockResolvedValue({ appointmentId });
+    transaction.syncIssue.findFirst.mockResolvedValue({
+      appointmentId,
+      operation: OUTBOX_CREATE_EVENT,
+    });
 
     await expect(service.retry(artistId, 'issue-1')).resolves.toEqual({
       status: 'queued',
@@ -225,11 +231,10 @@ describe('SyncIssuesService', () => {
     expect(transaction.syncIssue.findFirst).toHaveBeenCalledWith({
       where: {
         id: 'issue-1',
-        operation: OUTBOX_CREATE_EVENT,
         status: SyncIssueStatus.OPEN,
         appointment: { artistId },
       },
-      select: { appointmentId: true },
+      select: { appointmentId: true, operation: true },
     });
     expect(transaction.outboxEvent.findFirst).toHaveBeenCalledWith({
       where: { aggregateId: appointmentId, type: OUTBOX_CREATE_EVENT },
@@ -299,6 +304,77 @@ describe('SyncIssuesService', () => {
     expect(transaction.appointment.update).toHaveBeenCalledWith({
       where: { id: appointmentId },
       data: { syncStatus: SyncStatus.SYNCED },
+    });
+  });
+
+  it('upserts the CalendarEvent projection for an update', async () => {
+    await service.finalizeSuccess(outboxId, {
+      operation: 'update',
+      appointmentId,
+      calendarId: 'inkslot-calendar',
+      externalEventId: 'google-event-id',
+      etag: 'updated-etag',
+    });
+
+    expect(transaction.calendarEvent.upsert).toHaveBeenCalledWith({
+      where: { appointmentId },
+      create: expect.objectContaining({
+        appointmentId,
+        externalEventId: 'google-event-id',
+        etag: 'updated-etag',
+      }),
+      update: expect.objectContaining({
+        externalEventId: 'google-event-id',
+        etag: 'updated-etag',
+      }),
+    });
+    expect(transaction.syncIssue.updateMany).toHaveBeenCalledWith({
+      where: {
+        appointmentId,
+        operation: 'appointment.calendar.update',
+        status: SyncIssueStatus.OPEN,
+      },
+      data: { status: SyncIssueStatus.RESOLVED },
+    });
+  });
+
+  it('removes the local CalendarEvent when delete succeeds', async () => {
+    await service.finalizeSuccess(outboxId, {
+      operation: 'delete',
+      effect: 'deleted',
+      appointmentId,
+    });
+
+    expect(transaction.calendarEvent.deleteMany).toHaveBeenCalledWith({
+      where: { appointmentId },
+    });
+    expect(transaction.appointment.update).toHaveBeenCalledWith({
+      where: { id: appointmentId },
+      data: { syncStatus: SyncStatus.SYNCED },
+    });
+    expect(transaction.syncIssue.updateMany).toHaveBeenCalledWith({
+      where: {
+        appointmentId,
+        operation: 'appointment.calendar.delete',
+        status: SyncIssueStatus.OPEN,
+      },
+      data: { status: SyncIssueStatus.RESOLVED },
+    });
+  });
+
+  it('completes a cancelled create as a no-op without marking the appointment synced', async () => {
+    await service.finalizeSuccess(outboxId, {
+      operation: 'create',
+      effect: 'noop',
+      appointmentId,
+    });
+
+    expect(transaction.calendarEvent.create).not.toHaveBeenCalled();
+    expect(transaction.calendarEvent.upsert).not.toHaveBeenCalled();
+    expect(transaction.appointment.update).not.toHaveBeenCalled();
+    expect(transaction.outboxEvent.update).toHaveBeenCalledWith({
+      where: { id: outboxId },
+      data: { status: OutboxStatus.COMPLETED, nextAttemptAt: null },
     });
   });
 

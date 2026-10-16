@@ -60,7 +60,6 @@ export class SyncIssuesService {
     const status = query.status ?? 'open';
     const issues = await this.prisma.syncIssue.findMany({
       where: {
-        operation: OUTBOX_CREATE_EVENT,
         status:
           status === 'open' ? SyncIssueStatus.OPEN : SyncIssueStatus.RESOLVED,
         appointment: { artistId },
@@ -104,11 +103,10 @@ export class SyncIssuesService {
       const issue = await transaction.syncIssue.findFirst({
         where: {
           id: issueId,
-          operation: OUTBOX_CREATE_EVENT,
           status: SyncIssueStatus.OPEN,
           appointment: { artistId },
         },
-        select: { appointmentId: true },
+        select: { appointmentId: true, operation: true },
       });
 
       if (!issue) {
@@ -118,7 +116,7 @@ export class SyncIssuesService {
       const outbox = await transaction.outboxEvent.findFirst({
         where: {
           aggregateId: issue.appointmentId,
-          type: OUTBOX_CREATE_EVENT,
+          type: issue.operation,
         },
         orderBy: { createdAt: 'desc' },
         select: { id: true },
@@ -221,7 +219,7 @@ export class SyncIssuesService {
 
       await this.upsertOpenIssue(transaction, {
         appointmentId: event.aggregateId,
-        operation: OUTBOX_CREATE_EVENT,
+        operation: event.type,
         code: issueCode,
         message,
         lastAttemptAt: attemptedAt,
@@ -236,16 +234,63 @@ export class SyncIssuesService {
     syncedAt: Date,
     createCalendarEvent: boolean,
   ): Promise<void> {
-    if (createCalendarEvent) {
-      await transaction.calendarEvent.create({
-        data: {
+    if (success.operation === 'create' && 'effect' in success) {
+      await transaction.outboxEvent.update({
+        where: { id: outboxId },
+        data: { status: OutboxStatus.COMPLETED, nextAttemptAt: null },
+      });
+      await transaction.syncIssue.updateMany({
+        where: {
+          appointmentId: success.appointmentId,
+          operation: OUTBOX_CREATE_EVENT,
+          status: SyncIssueStatus.OPEN,
+        },
+        data: { status: SyncIssueStatus.RESOLVED },
+      });
+      return;
+    }
+
+    if (success.operation === 'delete') {
+      await transaction.calendarEvent.deleteMany({
+        where: { appointmentId: success.appointmentId },
+      });
+    } else if (success.operation === 'update' && createCalendarEvent) {
+      await transaction.calendarEvent.upsert({
+        where: { appointmentId: success.appointmentId },
+        create: {
           appointmentId: success.appointmentId,
           calendarId: success.calendarId,
           externalEventId: success.externalEventId,
           etag: success.etag,
           lastSyncedAt: syncedAt,
         },
+        update: {
+          calendarId: success.calendarId,
+          externalEventId: success.externalEventId,
+          etag: success.etag,
+          lastSyncedAt: syncedAt,
+        },
       });
+    } else {
+      const data = {
+        calendarId: success.calendarId,
+        externalEventId: success.externalEventId,
+        etag: success.etag,
+        lastSyncedAt: syncedAt,
+      };
+      if (createCalendarEvent) {
+        await transaction.calendarEvent.create({
+          data: {
+            appointmentId: success.appointmentId,
+            ...data,
+          },
+        });
+      } else {
+        await transaction.calendarEvent.update({
+          where: { appointmentId: success.appointmentId },
+          data,
+        });
+      }
     }
 
     await transaction.appointment.update({
@@ -259,7 +304,12 @@ export class SyncIssuesService {
     await transaction.syncIssue.updateMany({
       where: {
         appointmentId: success.appointmentId,
-        operation: OUTBOX_CREATE_EVENT,
+        operation:
+          success.operation === 'delete'
+            ? 'appointment.calendar.delete'
+            : success.operation === 'update'
+              ? 'appointment.calendar.update'
+              : OUTBOX_CREATE_EVENT,
         status: SyncIssueStatus.OPEN,
       },
       data: { status: SyncIssueStatus.RESOLVED },

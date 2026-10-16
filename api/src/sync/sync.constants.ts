@@ -4,6 +4,15 @@ export const SYNC_RANDOM = Symbol('SYNC_RANDOM');
 export const SCHEDULER_REGISTRY = Symbol('SCHEDULER_REGISTRY');
 export const OUTBOX_WORKER_INTERVAL = 'OUTBOX_WORKER_INTERVAL';
 export const OUTBOX_CREATE_EVENT = 'appointment.calendar.create';
+export const OUTBOX_UPDATE_EVENT = 'appointment.calendar.update';
+export const OUTBOX_DELETE_EVENT = 'appointment.calendar.delete';
+
+export type CalendarOutboxOperation = 'create' | 'update' | 'delete';
+
+export type CalendarOutboxEventType =
+  | typeof OUTBOX_CREATE_EVENT
+  | typeof OUTBOX_UPDATE_EVENT
+  | typeof OUTBOX_DELETE_EVENT;
 
 export type SyncConfig = {
   enabled: boolean;
@@ -38,6 +47,25 @@ export type SyncFailure = {
 };
 
 export type OutboxEventProcessor = (event: ClaimedOutboxEvent) => Promise<void>;
+
+export type CalendarSyncSuccess =
+  | {
+      operation: 'create' | 'update';
+      appointmentId: string;
+      calendarId: string;
+      externalEventId: string;
+      etag: string | null;
+    }
+  | {
+      operation: 'create';
+      effect: 'noop';
+      appointmentId: string;
+    }
+  | {
+      operation: 'delete';
+      effect: 'deleted';
+      appointmentId: string;
+    };
 
 export type SchedulerRegistryPort = {
   addInterval(name: string, interval: NodeJS.Timeout): void;

@@ -1,4 +1,4 @@
-import { CalendarConnectionStatus } from '@prisma/client';
+import { AppointmentStatus, CalendarConnectionStatus } from '@prisma/client';
 import { createHash } from 'node:crypto';
 
 import { CalendarProviderError } from '../calendar/calendar.provider';
@@ -26,6 +26,7 @@ describe('CalendarSyncService', () => {
   const appointment = {
     id: appointmentId,
     artistId,
+    status: AppointmentStatus.CONFIRMED,
     startAt,
     endAt,
     calendarEvent: null,
@@ -46,6 +47,8 @@ describe('CalendarSyncService', () => {
   };
   const calendar = {
     createEvent: jest.fn(),
+    updateEvent: jest.fn(),
+    deleteEvent: jest.fn(),
     getEvent: jest.fn(),
   };
   let service: CalendarSyncService;
@@ -111,6 +114,7 @@ describe('CalendarSyncService', () => {
 
   it('creates a safe Google Calendar projection and returns its result', async () => {
     await expect(service.process(event)).resolves.toEqual({
+      operation: 'create',
       appointmentId,
       calendarId,
       externalEventId: 'google-event-id',
@@ -151,6 +155,7 @@ describe('CalendarSyncService', () => {
     });
 
     await expect(service.process(event)).resolves.toEqual({
+      operation: 'create',
       appointmentId,
       calendarId,
       externalEventId: 'existing-google-event',
@@ -173,6 +178,7 @@ describe('CalendarSyncService', () => {
     });
 
     await expect(service.process(event)).resolves.toEqual({
+      operation: 'create',
       appointmentId,
       calendarId,
       externalEventId: service.deterministicEventId(appointmentId),
@@ -214,6 +220,102 @@ describe('CalendarSyncService', () => {
 
     expectSyncError(error, 'CALENDAR_UNAVAILABLE', true);
     expect(error.failure.message).not.toContain('private provider detail');
+  });
+
+  it('updates the existing deterministic event projection', async () => {
+    const updateEvent = {
+      ...event,
+      id: '77777777-7777-4777-8777-777777777777',
+      type: 'appointment.calendar.update',
+      payload: { appointmentId, operation: 'update' },
+    } as ClaimedOutboxEvent;
+    calendar.updateEvent.mockResolvedValue({
+      externalEventId: service.deterministicEventId(appointmentId),
+      etag: 'updated-etag',
+    });
+
+    await expect(service.process(updateEvent)).resolves.toEqual({
+      operation: 'update',
+      appointmentId,
+      calendarId,
+      externalEventId: service.deterministicEventId(appointmentId),
+      etag: 'updated-etag',
+    });
+    expect(calendar.updateEvent).toHaveBeenCalledWith(
+      artistId,
+      expect.objectContaining({
+        eventId: service.deterministicEventId(appointmentId),
+        startAt,
+        endAt,
+      }),
+    );
+    expect(calendar.createEvent).not.toHaveBeenCalled();
+  });
+
+  it('recreates an update when the external deterministic event is absent', async () => {
+    const updateEvent = {
+      ...event,
+      id: '77777777-7777-4777-8777-777777777777',
+      type: 'appointment.calendar.update',
+      payload: { appointmentId, operation: 'update' },
+    } as ClaimedOutboxEvent;
+    calendar.updateEvent.mockRejectedValue(
+      new CalendarProviderError(
+        'CALENDAR_EVENT_NOT_FOUND',
+        'provider detail',
+      ),
+    );
+    calendar.createEvent.mockResolvedValue({
+      externalEventId: service.deterministicEventId(appointmentId),
+      etag: 'recreated-etag',
+    });
+
+    await expect(service.process(updateEvent)).resolves.toEqual(
+      expect.objectContaining({ operation: 'update', etag: 'recreated-etag' }),
+    );
+    expect(calendar.createEvent).toHaveBeenCalledWith(
+      artistId,
+      expect.objectContaining({
+        eventId: service.deterministicEventId(appointmentId),
+      }),
+    );
+  });
+
+  it('deletes the deterministic event even when no local CalendarEvent is present', async () => {
+    const deleteEvent = {
+      ...event,
+      id: '88888888-8888-4888-8888-888888888888',
+      type: 'appointment.calendar.delete',
+      payload: { appointmentId, operation: 'delete' },
+    } as ClaimedOutboxEvent;
+    prisma.appointment.findUnique.mockResolvedValue({
+      ...appointment,
+      status: AppointmentStatus.CANCELLED,
+    });
+
+    await expect(service.process(deleteEvent)).resolves.toEqual({
+      operation: 'delete',
+      effect: 'deleted',
+      appointmentId,
+    });
+    expect(calendar.deleteEvent).toHaveBeenCalledWith(
+      artistId,
+      service.deterministicEventId(appointmentId),
+    );
+  });
+
+  it('completes a create as a no-op after the appointment was cancelled', async () => {
+    prisma.appointment.findUnique.mockResolvedValue({
+      ...appointment,
+      status: AppointmentStatus.CANCELLED,
+    });
+
+    await expect(service.process(event)).resolves.toEqual({
+      operation: 'create',
+      effect: 'noop',
+      appointmentId,
+    });
+    expect(calendar.createEvent).not.toHaveBeenCalled();
   });
 
   it('fails closed when the appointment or connection is unavailable', async () => {

@@ -1,52 +1,31 @@
 import { Injectable } from '@nestjs/common';
-import { CalendarConnectionStatus } from '@prisma/client';
+import {
+  AppointmentStatus,
+  CalendarConnectionStatus,
+} from '@prisma/client';
 import { createHash } from 'node:crypto';
 
-import { PrismaService } from '../database/prisma.service';
 import { CalendarProviderError } from '../calendar/calendar.provider';
 import { CalendarService } from '../calendar/calendar.service';
+import { PrismaService } from '../database/prisma.service';
 import {
   OUTBOX_CREATE_EVENT,
+  OUTBOX_DELETE_EVENT,
+  OUTBOX_UPDATE_EVENT,
+  type CalendarOutboxOperation,
+  type CalendarSyncSuccess,
   type ClaimedOutboxEvent,
   type SyncFailure,
 } from './sync.constants';
 
+export type { CalendarSyncSuccess } from './sync.constants';
+
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-type CreateAppointmentPayload = {
+type CalendarAppointmentPayload = {
   appointmentId: string;
-  operation: 'create';
-};
-
-type AppointmentForSync = {
-  id: string;
-  artistId: string;
-  startAt: Date;
-  endAt: Date;
-  calendarEvent: {
-    calendarId: string;
-    externalEventId: string;
-    etag: string | null;
-  } | null;
-  request: {
-    durationMinutes: number;
-    client: { name: string };
-  };
-  artist: {
-    studioSettings: { timezone: string } | null;
-    calendarConnection: {
-      calendarId: string;
-      status: CalendarConnectionStatus;
-    } | null;
-  };
-};
-
-export type CalendarSyncSuccess = {
-  appointmentId: string;
-  calendarId: string;
-  externalEventId: string;
-  etag: string | null;
+  operation: CalendarOutboxOperation;
 };
 
 export class CalendarSyncError extends Error {
@@ -70,6 +49,7 @@ export class CalendarSyncService {
       select: {
         id: true,
         artistId: true,
+        status: true,
         startAt: true,
         endAt: true,
         calendarEvent: {
@@ -104,8 +84,20 @@ export class CalendarSyncService {
       );
     }
 
-    if (appointment.calendarEvent) {
+    if (
+      payload.operation === 'create' &&
+      appointment.status !== AppointmentStatus.CONFIRMED
+    ) {
       return {
+        operation: 'create',
+        effect: 'noop',
+        appointmentId: appointment.id,
+      };
+    }
+
+    if (payload.operation === 'create' && appointment.calendarEvent) {
+      return {
+        operation: 'create',
         appointmentId: appointment.id,
         calendarId: appointment.calendarEvent.calendarId,
         externalEventId: appointment.calendarEvent.externalEventId,
@@ -114,11 +106,9 @@ export class CalendarSyncService {
     }
 
     const connection = appointment.artist.calendarConnection;
-    const timezone = appointment.artist.studioSettings?.timezone;
     if (
       !connection ||
-      connection.status !== CalendarConnectionStatus.CONNECTED ||
-      !timezone
+      connection.status !== CalendarConnectionStatus.CONNECTED
     ) {
       throw this.failure(
         'CALENDAR_UNAVAILABLE',
@@ -128,6 +118,29 @@ export class CalendarSyncService {
     }
 
     const eventId = this.deterministicEventId(appointment.id);
+
+    if (payload.operation === 'delete') {
+      try {
+        await this.calendar.deleteEvent(appointment.artistId, eventId);
+        return {
+          operation: 'delete',
+          effect: 'deleted',
+          appointmentId: appointment.id,
+        };
+      } catch (error) {
+        throw this.toSyncError(error);
+      }
+    }
+
+    const timezone = appointment.artist.studioSettings?.timezone;
+    if (!timezone) {
+      throw this.failure(
+        'CALENDAR_UNAVAILABLE',
+        'La conexión de Calendar no está disponible',
+        false,
+      );
+    }
+
     const input = {
       calendarId: connection.calendarId,
       eventId,
@@ -139,11 +152,16 @@ export class CalendarSyncService {
     };
 
     try {
-      const result = await this.calendar.createEvent(
-        appointment.artistId,
-        input,
+      const result =
+        payload.operation === 'create'
+          ? await this.calendar.createEvent(appointment.artistId, input)
+          : await this.calendar.updateEvent(appointment.artistId, input);
+      return this.success(
+        payload.operation,
+        appointment.id,
+        connection.calendarId,
+        result,
       );
-      return this.success(appointment.id, connection.calendarId, result);
     } catch (error) {
       if (
         error instanceof CalendarProviderError &&
@@ -154,7 +172,41 @@ export class CalendarSyncService {
           appointment.artistId,
           connection.calendarId,
           eventId,
+          payload.operation,
         );
+      }
+
+      if (
+        payload.operation === 'update' &&
+        error instanceof CalendarProviderError &&
+        error.code === 'CALENDAR_EVENT_NOT_FOUND'
+      ) {
+        try {
+          const recreated = await this.calendar.createEvent(
+            appointment.artistId,
+            input,
+          );
+          return this.success(
+            'update',
+            appointment.id,
+            connection.calendarId,
+            recreated,
+          );
+        } catch (recreateError) {
+          if (
+            recreateError instanceof CalendarProviderError &&
+            recreateError.code === 'CALENDAR_EVENT_EXISTS'
+          ) {
+            return this.recoverExistingEvent(
+              appointment.id,
+              appointment.artistId,
+              connection.calendarId,
+              eventId,
+              'update',
+            );
+          }
+          throw this.toSyncError(recreateError);
+        }
       }
 
       throw this.toSyncError(error);
@@ -172,10 +224,13 @@ export class CalendarSyncService {
     artistId: string,
     calendarId: string,
     eventId: string,
+    operation: 'create' | 'update',
   ): Promise<CalendarSyncSuccess> {
     try {
       const result = await this.calendar.getEvent(artistId, eventId);
-      if (result) return this.success(appointmentId, calendarId, result);
+      if (result) {
+        return this.success(operation, appointmentId, calendarId, result);
+      }
 
       throw this.failure(
         'CALENDAR_UNAVAILABLE',
@@ -188,35 +243,41 @@ export class CalendarSyncService {
     }
   }
 
-  private parsePayload(event: ClaimedOutboxEvent): CreateAppointmentPayload {
-    if (event.type !== OUTBOX_CREATE_EVENT || !this.isRecord(event.payload)) {
-      throw this.invalidPayload();
-    }
+  private parsePayload(event: ClaimedOutboxEvent): CalendarAppointmentPayload {
+    const operationByType: Record<string, CalendarOutboxOperation | undefined> =
+      {
+        [OUTBOX_CREATE_EVENT]: 'create',
+        [OUTBOX_UPDATE_EVENT]: 'update',
+        [OUTBOX_DELETE_EVENT]: 'delete',
+      };
+    const expectedOperation = operationByType[event.type];
 
-    const keys = Object.keys(event.payload).sort();
     if (
-      keys.length !== 2 ||
-      keys[0] !== 'appointmentId' ||
-      keys[1] !== 'operation' ||
+      !expectedOperation ||
+      !this.isRecord(event.payload) ||
+      Object.keys(event.payload).sort().join(',') !==
+        'appointmentId,operation' ||
       typeof event.payload.appointmentId !== 'string' ||
       !UUID_PATTERN.test(event.payload.appointmentId) ||
-      event.payload.operation !== 'create'
+      event.payload.operation !== expectedOperation
     ) {
       throw this.invalidPayload();
     }
 
     return {
       appointmentId: event.payload.appointmentId,
-      operation: 'create',
+      operation: expectedOperation,
     };
   }
 
   private success(
+    operation: 'create' | 'update',
     appointmentId: string,
     calendarId: string,
     result: { externalEventId: string; etag: string | null },
   ): CalendarSyncSuccess {
     return {
+      operation,
       appointmentId,
       calendarId,
       externalEventId: result.externalEventId,
