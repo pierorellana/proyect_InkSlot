@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/theme/inkslot_tokens.dart';
+import '../../../../core/widgets/inkslot_kit.dart';
 import '../../domain/booking_request_status.dart';
 
+/// Canal de contacto (`.seg`) y dato de contacto (`.fld`).
 class ContactChannelField extends StatelessWidget {
   const ContactChannelField({
     required this.channel,
@@ -10,54 +11,19 @@ class ContactChannelField extends StatelessWidget {
     required this.onChannelChanged,
     super.key,
     this.enabled = true,
+    this.errorText,
+    this.onChanged,
   });
 
   final ContactChannel channel;
   final TextEditingController controller;
   final ValueChanged<ContactChannel> onChannelChanged;
   final bool enabled;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      DropdownButtonFormField<ContactChannel>(
-        initialValue: channel,
-        isExpanded: true,
-        decoration: _decoration('Canal de contacto'),
-        items: ContactChannel.values
-            .map(
-              (value) => DropdownMenuItem<ContactChannel>(
-                value: value,
-                child: Text(value.label),
-              ),
-            )
-            .toList(growable: false),
-        onChanged: enabled
-            ? (value) {
-                if (value != null) onChannelChanged(value);
-              }
-            : null,
-      ),
-      const SizedBox(height: 14),
-      TextFormField(
-        controller: controller,
-        enabled: enabled,
-        keyboardType: channel.keyboardType,
-        textInputAction: TextInputAction.next,
-        maxLength: channel == ContactChannel.instagram ? 64 : 32,
-        validator: (value) => _validateContact(channel, value),
-        decoration: _decoration(
-          channel.valueLabel,
-          hintText: channel.hint,
-          prefixIcon: Icon(channel.icon, size: 20),
-          counterText: '',
-        ),
-      ),
-    ],
-  );
-
-  String? _validateContact(ContactChannel channel, String? value) {
+  /// Mensaje de error del dato de contacto, o `null` si es válido.
+  static String? validate(ContactChannel channel, String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return 'Ingresa un dato de contacto.';
     if (channel == ContactChannel.email &&
@@ -72,13 +38,41 @@ class ContactChannelField extends StatelessWidget {
     }
     return null;
   }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Semantics(
+        container: true,
+        label: 'Canal de contacto',
+        child: InkSlotSegmented(
+          labels: [for (final value in ContactChannel.values) value.label],
+          selected: ContactChannel.values.indexOf(channel),
+          onChanged: (index) {
+            if (enabled) onChannelChanged(ContactChannel.values[index]);
+          },
+        ),
+      ),
+      const SizedBox(height: 14),
+      InkSlotField(
+        label: channel.valueLabel,
+        controller: controller,
+        hint: channel.hint,
+        keyboardType: channel.keyboardType,
+        textInputAction: TextInputAction.next,
+        errorText: errorText,
+        onChanged: onChanged,
+      ),
+    ],
+  );
 }
 
 extension on ContactChannel {
   String get label => switch (this) {
     ContactChannel.whatsapp => 'WhatsApp',
     ContactChannel.instagram => 'Instagram',
-    ContactChannel.email => 'Correo electrónico',
+    ContactChannel.email => 'Correo',
     ContactChannel.phone => 'Teléfono',
   };
 
@@ -90,10 +84,10 @@ extension on ContactChannel {
   };
 
   String get hint => switch (this) {
-    ContactChannel.whatsapp => '+593 99 123 4567',
+    ContactChannel.whatsapp => '+593 …',
     ContactChannel.instagram => '@usuario',
     ContactChannel.email => 'cliente@correo.com',
-    ContactChannel.phone => '+593 2 123 4567',
+    ContactChannel.phone => '+593 …',
   };
 
   TextInputType get keyboardType => switch (this) {
@@ -101,48 +95,4 @@ extension on ContactChannel {
     ContactChannel.whatsapp || ContactChannel.phone => TextInputType.phone,
     ContactChannel.instagram => TextInputType.text,
   };
-
-  IconData get icon => switch (this) {
-    ContactChannel.whatsapp => Icons.chat_bubble_outline,
-    ContactChannel.instagram => Icons.camera_alt_outlined,
-    ContactChannel.email => Icons.mail_outline,
-    ContactChannel.phone => Icons.phone_outlined,
-  };
 }
-
-InputDecoration _decoration(
-  String label, {
-  String? hintText,
-  Widget? prefixIcon,
-  String? counterText,
-}) => InputDecoration(
-  labelText: label,
-  hintText: hintText,
-  prefixIcon: prefixIcon,
-  counterText: counterText,
-  filled: true,
-  fillColor: InkSlotColors.field,
-  labelStyle: const TextStyle(color: InkSlotColors.secondary),
-  hintStyle: const TextStyle(color: InkSlotColors.tertiary),
-  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
-  border: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.line),
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.line),
-  ),
-  focusedBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.copper, width: 1.5),
-  ),
-  errorBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.error),
-  ),
-  focusedErrorBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.error, width: 1.5),
-  ),
-);

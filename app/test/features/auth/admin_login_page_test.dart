@@ -12,15 +12,27 @@ void main() {
   Widget harness(AdminSessionController controller, {VoidCallback? onAuth}) =>
       MaterialApp(
         theme: buildInkSlotTheme(),
+        builder: (context, child) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(disableAnimations: true),
+          child: child!,
+        ),
         home: AdminLoginPage(
           sessionController: controller,
           onAuthenticated: onAuth,
         ),
       );
 
+  void usePhoneView(WidgetTester tester) {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+  }
+
   testWidgets('validates the login form before calling the API', (
     tester,
   ) async {
+    usePhoneView(tester);
     final repository = FakeAuthRepository();
     final controller = AdminSessionController(repository);
     await tester.pumpWidget(harness(controller));
@@ -29,13 +41,14 @@ void main() {
     await tester.pump();
 
     expect(find.text('Ingresa tu correo electrónico.'), findsOneWidget);
-    expect(find.text('Ingresa tu contraseña.'), findsOneWidget);
+    expect(find.text('Escribe tu contraseña para entrar.'), findsOneWidget);
     expect(repository.loginCalled, isFalse);
   });
 
   testWidgets('submits credentials and signals a successful session', (
     tester,
   ) async {
+    usePhoneView(tester);
     final repository = FakeAuthRepository();
     final controller = AdminSessionController(repository);
     var authenticated = false;
@@ -43,7 +56,7 @@ void main() {
       harness(controller, onAuth: () => authenticated = true),
     );
 
-    final fields = find.byType(TextFormField);
+    final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'artist@example.com');
     await tester.enterText(fields.at(1), 'correct-password');
     await tester.tap(find.text('Entrar'));
@@ -58,6 +71,7 @@ void main() {
   testWidgets('shows a safe API error and keeps the form available', (
     tester,
   ) async {
+    usePhoneView(tester);
     final repository = FakeAuthRepository(
       loginError: const ApiException(
         statusCode: 401,
@@ -68,7 +82,7 @@ void main() {
     final controller = AdminSessionController(repository);
     await tester.pumpWidget(harness(controller));
 
-    final fields = find.byType(TextFormField);
+    final fields = find.byType(TextField);
     await tester.enterText(fields.at(0), 'artist@example.com');
     await tester.enterText(fields.at(1), 'wrong-password');
     await tester.tap(find.text('Entrar'));

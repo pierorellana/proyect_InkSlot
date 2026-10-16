@@ -98,11 +98,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No fue posible sincronizar el evento.'), findsOneWidget);
-    final retryButton = find.widgetWithText(InkSlotPrimaryButton, 'Reintentar');
+    final retryButton = find.widgetWithText(
+      InkSlotPrimaryButton,
+      'Reintentar ahora',
+    );
     expect(retryButton, findsOneWidget);
 
     await tester.tap(retryButton);
     await tester.pumpAndSettle();
+    expect(find.text('Evento creado en Google Calendar'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 4));
 
     expect(repository.retriedIds, ['open-1']);
 
@@ -125,7 +130,7 @@ void main() {
 
     expect(find.text('Incidencia resuelta.'), findsOneWidget);
     expect(
-      find.widgetWithText(InkSlotPrimaryButton, 'Reintentar'),
+      find.widgetWithText(InkSlotPrimaryButton, 'Reintentar ahora'),
       findsNothing,
     );
   });
@@ -133,6 +138,10 @@ void main() {
 
 Widget _host(Widget child) => MaterialApp(
   theme: buildInkSlotTheme(),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(disableAnimations: true),
+    child: child!,
+  ),
   home: Scaffold(body: child),
 );
 

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:inkslot_app/core/network/api_client.dart';
 import 'package:inkslot_app/core/network/api_exception.dart';
 import 'package:inkslot_app/core/router/app_router.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
+import 'package:inkslot_app/features/agenda/presentation/admin_agenda_page.dart';
 import 'package:inkslot_app/features/appointments/data/admin_appointments_repository.dart';
 import 'package:inkslot_app/features/appointments/domain/admin_appointment.dart';
 import 'package:inkslot_app/features/appointments/presentation/admin_appointments_controller.dart';
@@ -28,6 +30,15 @@ import 'package:inkslot_app/features/sync_issues/domain/sync_issue.dart';
 import 'package:inkslot_app/features/sync_issues/presentation/sync_issues_controller.dart';
 import 'package:inkslot_app/features/sync_issues/presentation/sync_issues_page.dart';
 
+Widget _app(GoRouter router) => MaterialApp.router(
+  theme: buildInkSlotTheme(),
+  routerConfig: router,
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(disableAnimations: true),
+    child: child!,
+  ),
+);
+
 void main() {
   testWidgets('redirects signed-out admin deep links to login', (tester) async {
     final session = AdminSessionController(FakeAuthRepository());
@@ -37,9 +48,7 @@ void main() {
     );
     addTearDown(router.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
-    );
+    await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
 
     expect(router.routerDelegate.currentConfiguration.uri.path, '/admin/login');
@@ -65,9 +74,7 @@ void main() {
     addTearDown(requests.dispose);
     addTearDown(dashboard.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
-    );
+    await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
 
     expect(router.routerDelegate.currentConfiguration.uri.path, '/admin');
@@ -100,12 +107,10 @@ void main() {
     addTearDown(appointments.dispose);
     addTearDown(syncIssues.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
-    );
+    await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Citas'));
+    await tester.tap(find.text('CITAS'));
     await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
@@ -113,18 +118,59 @@ void main() {
     );
     expect(find.byType(AdminAppointmentsPage), findsOneWidget);
 
-    await tester.tap(find.text('Incidencias'));
+    await tester.tap(find.text('AGENDA'));
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/admin/agenda',
+    );
+    expect(find.byType(AdminAgendaPage), findsOneWidget);
+
+    await tester.tap(find.text('INICIO'));
+    await tester.pumpAndSettle();
+    expect(router.routerDelegate.currentConfiguration.uri.path, '/admin');
+    expect(find.byType(AdminDashboardPage), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Nueva solicitud').first);
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/admin/requests/new',
+    );
+    expect(find.text('ENLACES'), findsNothing);
+
+    router.go('/admin/sync-issues');
+    await tester.pumpAndSettle();
+    expect(find.byType(SyncIssuesPage), findsOneWidget);
+  });
+
+  testWidgets('opens sync issues from the dashboard banner', (tester) async {
+    final session = AdminSessionController(FakeAuthRepository());
+    await session.login('artist@example.com', 'password');
+    final dashboard = AdminDashboardController(
+      FakeDashboardRepository(() async => _dashboard(syncIssues: 1)),
+    );
+    final syncIssues = SyncIssuesController(FakeSyncIssuesRepository());
+    final router = AppRouter.create(
+      initialLocation: '/admin',
+      sessionController: session,
+      dashboardController: dashboard,
+      syncIssuesController: syncIssues,
+    );
+    addTearDown(router.dispose);
+    addTearDown(dashboard.dispose);
+    addTearDown(syncIssues.dispose);
+
+    await tester.pumpWidget(_app(router));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('1 cita sin sincronizar'));
     await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
       '/admin/sync-issues',
     );
     expect(find.byType(SyncIssuesPage), findsOneWidget);
-
-    await tester.tap(find.text('Inicio').last);
-    await tester.pumpAndSettle();
-    expect(router.routerDelegate.currentConfiguration.uri.path, '/admin');
-    expect(find.byType(AdminDashboardPage), findsOneWidget);
   });
 
   testWidgets('keeps public deep links outside the admin guard', (
@@ -137,9 +183,7 @@ void main() {
     );
     addTearDown(router.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
-    );
+    await tester.pumpWidget(_app(router));
     await tester.pump();
 
     expect(find.byType(PublicWelcomePage), findsOneWidget);
@@ -163,9 +207,7 @@ void main() {
     addTearDown(router.dispose);
     addTearDown(requests.dispose);
 
-    await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
-    );
+    await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
 
     expect(find.byType(AdminShell), findsOneWidget);
@@ -191,15 +233,15 @@ void main() {
         ..physicalSize = const Size(800, 600)
         ..devicePixelRatio = 1;
     });
-    await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
-    );
+    await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
-    expect(find.text('ESPACIO DE TRABAJO'), findsAtLeastNWidgets(2));
+    expect(find.text('Cerrar sesión'), findsOneWidget);
+    expect(find.text('ENLACES'), findsNothing);
 
     tester.view.physicalSize = const Size(390, 844);
     await tester.pumpAndSettle();
-    expect(find.text('Salir'), findsOneWidget);
+    expect(find.text('ENLACES'), findsOneWidget);
+    expect(find.text('Cerrar sesión'), findsNothing);
   });
 }
 
@@ -273,10 +315,10 @@ class _NoopApiClient implements ApiClient {
   }) async => <String, dynamic>{};
 }
 
-AdminDashboard _dashboard() => AdminDashboard(
+AdminDashboard _dashboard({int syncIssues = 0}) => AdminDashboard(
   pendingRequests: 2,
   upcomingAppointments: 1,
-  syncIssues: 0,
+  syncIssues: syncIssues,
   nextAppointments: [
     DashboardAppointment(
       id: 'appointment-a',

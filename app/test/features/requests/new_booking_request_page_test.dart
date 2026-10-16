@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inkslot_app/core/network/api_client.dart';
 import 'package:inkslot_app/core/router/app_router.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
+import 'package:inkslot_app/core/widgets/inkslot_kit.dart';
 import 'package:inkslot_app/features/auth/data/auth_repository.dart';
 import 'package:inkslot_app/features/auth/domain/admin_user.dart';
 import 'package:inkslot_app/features/auth/presentation/admin_session_controller.dart';
@@ -13,32 +14,55 @@ import 'package:inkslot_app/features/requests/presentation/booking_requests_cont
 import 'package:inkslot_app/features/requests/presentation/link_ready_page.dart';
 import 'package:inkslot_app/features/requests/presentation/new_booking_request_page.dart';
 
+Widget _app({required Widget home}) => MaterialApp(
+  theme: buildInkSlotTheme(),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(disableAnimations: true),
+    child: child!,
+  ),
+  home: home,
+);
+
+void usePhoneView(WidgetTester tester) {
+  tester.view
+    ..physicalSize = const Size(390, 844)
+    ..devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 void main() {
-  testWidgets('validates the client and deposit before creating', (
-    tester,
-  ) async {
+  testWidgets('disables creation and lists what is missing', (tester) async {
+    usePhoneView(tester);
     final repository = RecordingBookingRequestsRepository();
     final controller = BookingRequestsController(repository);
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildInkSlotTheme(),
+      _app(
         home: Scaffold(body: NewBookingRequestHarness(controller: controller)),
       ),
     );
+    await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('Crear solicitud'));
-    await tester.tap(find.text('Crear solicitud'));
+    expect(
+      find.text(
+        'Falta: nombre del cliente · dato de contacto · confirmar anticipo',
+      ),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Crear y generar enlace'), warnIfMissed: false);
     await tester.pump();
-
-    expect(find.text('Ingresa el nombre del cliente.'), findsOneWidget);
-    expect(find.text('Confirma el anticipo para continuar.'), findsOneWidget);
     expect(repository.input, isNull);
+
+    await tester.enterText(find.byType(TextField).at(0), 'Ana Ink');
+    await tester.enterText(find.byType(TextField).at(1), '+593 99 123 4567');
+    await tester.pump();
+    expect(find.text('Falta: confirmar anticipo'), findsOneWidget);
   });
 
   testWidgets(
     'submits all request fields and keeps the token out of the route',
     (tester) async {
+      usePhoneView(tester);
       final repository = RecordingBookingRequestsRepository();
       final controller = BookingRequestsController(repository);
       final session = AdminSessionController(RecordingAuthRepository());
@@ -47,6 +71,10 @@ void main() {
       await tester.pumpWidget(
         MaterialApp.router(
           theme: buildInkSlotTheme(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: child!,
+          ),
           routerConfig: AppRouter.create(
             initialLocation: '/admin/requests/new',
             sessionController: session,
@@ -56,14 +84,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final textFields = find.byType(TextFormField);
+      final textFields = find.byType(TextField);
       await tester.enterText(textFields.at(0), 'Ana Ink');
       await tester.enterText(textFields.at(1), '+593 99 123 4567');
       await tester.enterText(textFields.at(2), 'Transferencia 0045');
-      await tester.ensureVisible(find.byType(Checkbox));
-      await tester.tap(find.byType(Checkbox));
-      await tester.ensureVisible(find.text('Crear solicitud'));
-      await tester.tap(find.text('Crear solicitud'));
+      await tester.tap(find.byType(InkSlotSwitch).first);
+      await tester.pump();
+      await tester.tap(find.text('Crear y generar enlace'));
       await tester.pumpAndSettle();
 
       expect(repository.input?.clientName, 'Ana Ink');
@@ -74,32 +101,53 @@ void main() {
       expect(repository.input?.durationMinutes, 180);
       expect(find.byType(LinkReadyPage), findsOneWidget);
       expect(find.textContaining('/r/secret-token'), findsOneWidget);
+      expect(find.textContaining('Ana.'), findsOneWidget);
     },
   );
 
   testWidgets('supports all contact channels and channel-specific labels', (
     tester,
   ) async {
+    usePhoneView(tester);
     final controller = BookingRequestsController(
       RecordingBookingRequestsRepository(),
     );
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildInkSlotTheme(),
+      _app(
         home: Scaffold(body: NewBookingRequestHarness(controller: controller)),
       ),
     );
+    await tester.pumpAndSettle();
 
-    await tester.ensureVisible(
-      find.byType(DropdownButtonFormField<ContactChannel>),
-    );
-    await tester.tap(find.byType(DropdownButtonFormField<ContactChannel>));
-    await tester.pump();
-    await tester.tap(find.text('Instagram').last);
-    await tester.pump();
+    expect(find.text('Número de WhatsApp'), findsOneWidget);
+    await tester.tap(find.text('Instagram'));
+    await tester.pumpAndSettle();
 
     expect(find.text('Usuario de Instagram'), findsOneWidget);
     expect(find.text('@usuario'), findsOneWidget);
+    expect(find.text('Correo'), findsOneWidget);
+    expect(find.text('Teléfono'), findsOneWidget);
+  });
+
+  testWidgets('adjusts the duration in 30 minute steps', (tester) async {
+    usePhoneView(tester);
+    final controller = BookingRequestsController(
+      RecordingBookingRequestsRepository(),
+    );
+    await tester.pumpWidget(
+      _app(
+        home: Scaffold(body: NewBookingRequestHarness(controller: controller)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.bySemanticsLabel('Sumar 30 minutos'));
+    await tester.tap(find.bySemanticsLabel('Sumar 30 minutos'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('3 h 30 min'), findsOneWidget);
+    await tester.tap(find.text('1 h'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('1 h 00 min'), findsOneWidget);
   });
 }
 

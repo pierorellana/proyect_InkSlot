@@ -1,12 +1,18 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
-import '../../../core/widgets/inkslot_mono_label.dart';
+import '../../../core/widgets/inkslot_icon.dart';
+import '../../../core/widgets/inkslot_kit.dart';
+import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
 import '../domain/booking_request_status.dart';
 import 'booking_requests_controller.dart';
+import 'link_ready_page.dart';
 import 'widgets/contact_channel_field.dart';
 import 'widgets/request_form_sections.dart';
 
@@ -20,7 +26,13 @@ class NewBookingRequestPage extends StatefulWidget {
 }
 
 class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
-  final _formKey = GlobalKey<FormState>();
+  static const _timeRanges = <(String, String?)>[
+    ('Mañana', '09:00–12:00'),
+    ('Mediodía', '12:00–16:00'),
+    ('Tarde', '16:00–20:00'),
+    ('Todo el día', null),
+  ];
+
   final _nameController = TextEditingController();
   final _contactController = TextEditingController();
   final _referenceController = TextEditingController();
@@ -28,7 +40,6 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
   ContactChannel _channel = ContactChannel.whatsapp;
   bool _depositVerified = false;
   bool _hasRestrictions = false;
-  String? _depositError;
   int _durationMinutes = 180;
   int _ttlHours = 48;
   DateTime? _preferredDate;
@@ -43,24 +54,26 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
     super.dispose();
   }
 
+  List<String> get _missing => [
+    if (_nameController.text.trim().length < 2) 'nombre del cliente',
+    if (ContactChannelField.validate(_channel, _contactController.text) != null)
+      'dato de contacto',
+    if (_referenceController.text.trim().length > 160)
+      'referencia de máximo 160 caracteres',
+    if (!_depositVerified) 'confirmar anticipo',
+  ];
+
   Future<void> _submit() async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final valid = _formKey.currentState?.validate() ?? false;
-    if (!_depositVerified) {
-      setState(() => _depositError = 'Confirma el anticipo para continuar.');
-    } else {
-      setState(() => _depositError = null);
-    }
-    if (!valid || !_depositVerified) return;
+    if (_missing.isNotEmpty) return;
 
     widget.controller.clearError();
+    final reference = _referenceController.text.trim();
     final input = CreateBookingRequestInput(
       clientName: _nameController.text.trim(),
       contactChannel: _channel,
       contactValue: _contactController.text.trim(),
-      paymentReference: _referenceController.text.trim().isEmpty
-          ? null
-          : _referenceController.text.trim(),
+      paymentReference: reference.isEmpty ? null : reference,
       depositVerified: true,
       durationMinutes: _durationMinutes,
       preferredDate: _hasRestrictions ? _preferredDate : null,
@@ -73,7 +86,14 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
 
     final link = await widget.controller.create(input);
     if (!mounted || link == null) return;
-    context.go('/admin/requests/link', extra: link);
+    context.go(
+      '/admin/requests/link',
+      extra: LinkReadyArgs(
+        link: link,
+        clientName: input.clientName,
+        durationMinutes: input.durationMinutes,
+      ),
+    );
   }
 
   Future<void> _pickDate() async {
@@ -92,369 +112,323 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 760;
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(4, 4, 4, 32),
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 920),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _PageHeader(
-                  eyebrow: 'Solicitudes · nueva',
-                  title: 'Crea un espacio\npara reservar.',
-                  onBack: () => context.go('/admin/requests'),
-                ),
-                const SizedBox(height: 28),
-                if (isWide)
+    final media = MediaQuery.of(context);
+    final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
+    return AdminUpIn(
+      child: Stack(
+        children: [
+          Positioned.fill(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                topInset,
+                20,
+                140 + media.padding.bottom,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(child: _clientSection()),
-                      const SizedBox(width: 16),
-                      Expanded(child: _depositSection()),
+                      Row(
+                        children: [
+                          Text(
+                            'ANTICIPO',
+                            style: inkSlotMono(color: InkSlotColors.tertiary),
+                          ),
+                          const SizedBox(width: 6),
+                          const InkSlotIcon(
+                            InkSlotIcons.flechaDerecha,
+                            size: 12,
+                            color: InkSlotColors.tertiary,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'ENLACE',
+                            style: inkSlotMono(color: InkSlotColors.tertiary),
+                          ),
+                        ],
+                      ),
+                      InkSlotIconButton(
+                        icon: InkSlotIcons.cerrar,
+                        semanticLabel: 'Cerrar',
+                        onPressed: () => context.go('/admin/requests'),
+                      ),
                     ],
-                  )
-                else ...[
-                  _clientSection(),
+                  ),
                   const SizedBox(height: 16),
+                  Text('Nueva solicitud', style: inkSlotSerif(42)),
+                  _clientSection(),
                   _depositSection(),
+                  RequestSection(
+                    label: '03 · Duración',
+                    child: RequestDurationField(
+                      value: _durationMinutes,
+                      onChanged: (value) =>
+                          setState(() => _durationMinutes = value),
+                    ),
+                  ),
+                  _restrictionsSection(),
+                  RequestSection(
+                    label: '05 · Vigencia del enlace',
+                    child: RequestTtlField(
+                      value: _ttlHours,
+                      onChanged: (value) => setState(() => _ttlHours = value),
+                    ),
+                  ),
                 ],
-                const SizedBox(height: 16),
-                RequestSection(
-                  label: '02 · Sesión',
-                  title: 'Define el tiempo del tatuaje.',
-                  child: RequestDurationField(
-                    value: _durationMinutes,
-                    onChanged: (value) =>
-                        setState(() => _durationMinutes = value),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _restrictionsSection(),
-                const SizedBox(height: 16),
-                RequestSection(
-                  label: '04 · Enlace privado',
-                  title: 'Dale un margen para decidir.',
-                  child: RequestTtlField(
-                    value: _ttlHours,
-                    onChanged: (value) => setState(() => _ttlHours = value),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                AnimatedBuilder(
-                  animation: widget.controller,
-                  builder: (context, child) {
-                    final submitting =
-                        widget.controller.mutationStatus ==
-                        BookingRequestMutationStatus.submitting;
-                    final error = widget.controller.mutationError;
-                    final duration = MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : InkSlotMotion.micro;
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        AnimatedSwitcher(
-                          duration: duration,
-                          child: error == null
-                              ? const SizedBox.shrink(key: ValueKey('no-error'))
-                              : Padding(
-                                  key: const ValueKey('request-error'),
-                                  padding: const EdgeInsets.only(bottom: 14),
-                                  child: Semantics(
-                                    liveRegion: true,
-                                    child: Text(
-                                      error,
-                                      style: const TextStyle(
-                                        color: InkSlotColors.errorText,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                        ),
-                        InkSlotPrimaryButton(
-                          label: submitting
-                              ? 'Creando enlace…'
-                              : 'Crear solicitud',
-                          onPressed: submitting ? null : _submit,
-                          trailing: submitting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: InkSlotColors.ink,
-                                  ),
-                                )
-                              : const Icon(Icons.arrow_forward, size: 20),
-                        ),
-                        const SizedBox(height: 10),
-                        TextButton(
-                          onPressed: submitting
-                              ? null
-                              : () => context.go('/admin/requests'),
-                          child: const Text('Cancelar'),
-                        ),
-                      ],
-                    );
-                  },
-                ),
-              ],
+              ),
             ),
           ),
-        ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _BottomBar(
+              controller: widget.controller,
+              missing: _missing,
+              onSubmit: _submit,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _clientSection() => RequestSection(
-    label: '01 · Cliente',
-    title: '¿Para quién es este espacio?',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        TextFormField(
-          controller: _nameController,
-          textInputAction: TextInputAction.next,
-          textCapitalization: TextCapitalization.words,
-          validator: (value) {
-            if ((value?.trim().length ?? 0) < 2) {
-              return 'Ingresa el nombre del cliente.';
-            }
-            return null;
-          },
-          decoration: _fieldDecoration(
-            'Nombre del cliente',
-            hintText: 'Nombre y apellido',
+  Widget _clientSection() {
+    final contactText = _contactController.text;
+    return RequestSection(
+      label: '01 · Cliente',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          InkSlotField(
+            label: 'Nombre',
+            controller: _nameController,
+            hint: 'Ej. Valentina Rosero',
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => setState(() {}),
           ),
-        ),
-        const SizedBox(height: 16),
-        ContactChannelField(
-          channel: _channel,
-          controller: _contactController,
-          onChannelChanged: (channel) => setState(() => _channel = channel),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _referenceController,
-          textInputAction: TextInputAction.next,
-          maxLength: 160,
-          validator: (value) {
-            final text = value?.trim() ?? '';
-            if (text.length > 160) return 'Usa máximo 160 caracteres.';
-            return null;
-          },
-          decoration: _fieldDecoration(
-            'Referencia del anticipo · opcional',
-            hintText: 'Ej. Transferencia 0045',
-            counterText: '',
+          const SizedBox(height: 14),
+          ContactChannelField(
+            channel: _channel,
+            controller: _contactController,
+            onChannelChanged: (channel) => setState(() => _channel = channel),
+            onChanged: (_) => setState(() {}),
+            errorText: contactText.trim().isEmpty
+                ? null
+                : ContactChannelField.validate(_channel, contactText),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 
   Widget _depositSection() => RequestSection(
-    label: '01 · Anticipo',
-    title: 'Confirma el punto de partida.',
-    child: DepositConfirmationField(
-      value: _depositVerified,
-      error: _depositError,
-      onChanged: (value) => setState(() {
-        _depositVerified = value;
-        if (value) _depositError = null;
-      }),
+    label: '02 · Anticipo',
+    child: InkSlotCard(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DepositConfirmationField(
+            value: _depositVerified,
+            onChanged: (value) => setState(() => _depositVerified = value),
+          ),
+          const SizedBox(height: 14),
+          InkSlotField(
+            label: 'Referencia (opcional)',
+            controller: _referenceController,
+            hint: 'Ej. Transf. 0045',
+            onChanged: (_) => setState(() {}),
+          ),
+        ],
+      ),
     ),
   );
 
   Widget _restrictionsSection() => RequestSection(
-    label: '03 · Restricciones',
-    title: 'Comparte cuándo le viene bien.',
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          container: true,
-          label: 'Añadir preferencias de agenda',
-          toggled: _hasRestrictions,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    label: '04 · Restricciones (opcional)',
+    child: InkSlotCard(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
             children: [
-              Switch.adaptive(
-                value: _hasRestrictions,
-                onChanged: (value) => setState(() => _hasRestrictions = value),
-                activeThumbColor: InkSlotColors.copper,
-              ),
-              const SizedBox(width: 12),
               const Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(top: 8),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Añadir preferencias de agenda',
-                        style: TextStyle(fontWeight: FontWeight.w500),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Limitar fechas u horas',
+                      style: TextStyle(
+                        color: InkSlotColors.bone,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
                       ),
-                      SizedBox(height: 5),
-                      Text(
-                        'Son una guía; el cliente elegirá entre los espacios disponibles.',
-                        style: TextStyle(
-                          color: InkSlotColors.secondary,
-                          fontSize: 13,
-                          height: 1.35,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    SizedBox(height: 3),
+                    Text(
+                      'Solo reduce tu jornada; nunca la amplía.',
+                      style: TextStyle(color: Color(0xFF9B968E), fontSize: 13),
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(width: 14),
+              InkSlotSwitch(
+                value: _hasRestrictions,
+                semanticLabel: 'Limitar fechas u horas',
+                onChanged: (value) => setState(() => _hasRestrictions = value),
               ),
             ],
           ),
-        ),
-        if (_hasRestrictions) ...[
-          const SizedBox(height: 12),
-          const Text(
-            'Días preferidos',
-            style: TextStyle(
-              color: InkSlotColors.cream,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 10),
-          RequestDaysField(
-            values: _preferredDays,
-            onChanged: (values) => setState(() => _preferredDays = values),
-          ),
-          const SizedBox(height: 18),
-          InkWell(
-            onTap: _pickDate,
-            borderRadius: BorderRadius.circular(16),
-            child: InputDecorator(
-              decoration: _fieldDecoration(
-                'Fecha preferida · opcional',
-                prefixIcon: const Icon(Icons.calendar_today_outlined, size: 19),
-              ),
-              child: Text(
-                _preferredDate == null
-                    ? 'Elegir una fecha'
-                    : _formatDate(_preferredDate!),
-                style: TextStyle(
-                  color: _preferredDate == null
-                      ? InkSlotColors.tertiary
-                      : InkSlotColors.cream,
+          if (_hasRestrictions)
+            InkSlotRise(
+              duration: const Duration(milliseconds: 650),
+              offset: 16,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const _SubLabel('Días permitidos'),
+                    const SizedBox(height: 14),
+                    RequestDaysField(
+                      values: _preferredDays,
+                      onChanged: (values) =>
+                          setState(() => _preferredDays = values),
+                    ),
+                    const SizedBox(height: 14),
+                    const _SubLabel('Fecha preferida'),
+                    const SizedBox(height: 14),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: InkSlotChip(
+                        label: _preferredDate == null
+                            ? 'Elegir una fecha'
+                            : _formatDate(_preferredDate!),
+                        icon: InkSlotIcons.calendario,
+                        selected: _preferredDate != null,
+                        onTap: _pickDate,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const _SubLabel('Franja'),
+                    const SizedBox(height: 14),
+                    InkSlotSegmented(
+                      labels: [for (final (label, _) in _timeRanges) label],
+                      selected: _timeRanges
+                          .indexWhere((item) => item.$2 == _preferredTimeRange)
+                          .clamp(0, _timeRanges.length - 1),
+                      onChanged: (index) => setState(
+                        () => _preferredTimeRange = _timeRanges[index].$2,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _preferredTimeRange,
-            decoration: _fieldDecoration(
-              'Franja horaria · opcional',
-              prefixIcon: const Icon(Icons.schedule_outlined, size: 20),
-            ),
-            hint: const Text('Cualquier horario'),
-            items: const [
-              DropdownMenuItem(
-                value: '09:00–12:00',
-                child: Text('Mañana · 09:00–12:00'),
-              ),
-              DropdownMenuItem(
-                value: '12:00–16:00',
-                child: Text('Mediodía · 12:00–16:00'),
-              ),
-              DropdownMenuItem(
-                value: '16:00–20:00',
-                child: Text('Tarde · 16:00–20:00'),
-              ),
-            ],
-            onChanged: (value) => setState(() => _preferredTimeRange = value),
-          ),
         ],
-      ],
+      ),
     ),
   );
 }
 
-class _PageHeader extends StatelessWidget {
-  const _PageHeader({
-    required this.eyebrow,
-    required this.title,
-    required this.onBack,
-  });
+class _SubLabel extends StatelessWidget {
+  const _SubLabel(this.text);
 
-  final String eyebrow;
-  final String title;
-  final VoidCallback onBack;
+  final String text;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Row(
-        children: [
-          IconButton(
-            onPressed: onBack,
-            tooltip: 'Volver a solicitudes',
-            icon: const Icon(Icons.arrow_back),
-          ),
-          const SizedBox(width: 4),
-          InkSlotMonoLabel(eyebrow, color: InkSlotColors.copperLight),
-        ],
-      ),
-      const SizedBox(height: 18),
-      Text(title, style: Theme.of(context).textTheme.displaySmall),
-      const SizedBox(height: 12),
-      Text(
-        'Prepara una solicitud clara y entrega un enlace privado listo para compartir.',
-        style: Theme.of(context).textTheme.bodyMedium,
-      ),
-    ],
+  Widget build(BuildContext context) => Text(
+    text,
+    style: const TextStyle(color: InkSlotColors.secondary, fontSize: 13),
   );
 }
 
-InputDecoration _fieldDecoration(
-  String label, {
-  String? hintText,
-  Widget? prefixIcon,
-  String? counterText,
-}) => InputDecoration(
-  labelText: label,
-  hintText: hintText,
-  prefixIcon: prefixIcon,
-  counterText: counterText,
-  filled: true,
-  fillColor: InkSlotColors.field,
-  labelStyle: const TextStyle(color: InkSlotColors.secondary),
-  hintStyle: const TextStyle(color: InkSlotColors.tertiary),
-  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 17),
-  border: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.line),
-  ),
-  enabledBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.line),
-  ),
-  focusedBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.copper, width: 1.5),
-  ),
-  errorBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.error),
-  ),
-  focusedErrorBorder: OutlineInputBorder(
-    borderRadius: BorderRadius.circular(16),
-    borderSide: const BorderSide(color: InkSlotColors.error, width: 1.5),
-  ),
-);
+/// Barra inferior fija: "Falta: …" y botón de crear, con blur de 16.
+class _BottomBar extends StatelessWidget {
+  const _BottomBar({
+    required this.controller,
+    required this.missing,
+    required this.onSubmit,
+  });
+
+  final BookingRequestsController controller;
+  final List<String> missing;
+  final VoidCallback onSubmit;
+
+  @override
+  Widget build(BuildContext context) => ClipRect(
+    child: BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+      child: Container(
+        padding: EdgeInsets.fromLTRB(
+          20,
+          16,
+          20,
+          MediaQuery.paddingOf(context).bottom + 6 < 30
+              ? 30
+              : MediaQuery.paddingOf(context).bottom + 6,
+        ),
+        decoration: const BoxDecoration(
+          color: Color(0xEB0A0A0B),
+          border: Border(top: BorderSide(color: Color(0x0FEEE9E0))),
+        ),
+        child: AnimatedBuilder(
+          animation: controller,
+          builder: (context, _) {
+            final submitting =
+                controller.mutationStatus ==
+                BookingRequestMutationStatus.submitting;
+            final error = controller.mutationError;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        error,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: InkSlotColors.errorText,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  )
+                else if (missing.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'Falta: ${missing.join(' · ')}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Color(0xFF9B968E),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                InkSlotPrimaryButton(
+                  label: submitting ? 'Creando…' : 'Crear y generar enlace',
+                  loading: submitting,
+                  onPressed: missing.isEmpty ? onSubmit : null,
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    ),
+  );
+}
 
 String _dayLabel(int value) => switch (value) {
   1 => 'lunes',

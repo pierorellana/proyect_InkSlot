@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inkslot_app/core/network/api_client.dart';
 import 'package:inkslot_app/core/network/api_exception.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
+import 'package:inkslot_app/core/widgets/inkslot_motion.dart';
 import 'package:inkslot_app/features/dashboard/data/admin_dashboard_repository.dart';
 import 'package:inkslot_app/features/dashboard/domain/admin_dashboard.dart';
 import 'package:inkslot_app/features/dashboard/presentation/admin_dashboard_controller.dart';
@@ -22,11 +23,19 @@ void main() {
     await tester.pumpWidget(_host(AdminDashboardPage(controller: controller)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Solicitudes pendientes'), findsOneWidget);
-    expect(find.text('Próximas citas'), findsAtLeastNWidgets(1));
-    expect(find.text('Incidencias abiertas'), findsOneWidget);
+    expect(find.textContaining('Por agendar  2'), findsOneWidget);
+    expect(find.text('Próximas citas'), findsOneWidget);
+    expect(find.text('3 citas sin sincronizar'), findsOneWidget);
+    expect(find.text('Nueva solicitud'), findsOneWidget);
     expect(find.text('Cliente A'), findsOneWidget);
-    expect(find.text('Calendar: sincronizado'), findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.label == 'Calendar: sincronizado',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('shows a loading state while the dashboard is pending', (
@@ -41,7 +50,8 @@ void main() {
     await tester.pumpWidget(_host(AdminDashboardPage(controller: controller)));
     await tester.pump();
 
-    expect(find.byType(CircularProgressIndicator), findsNWidgets(5));
+    expect(find.byType(InkSlotPulse), findsOneWidget);
+    expect(find.text('Cliente A'), findsNothing);
 
     completer.complete(_dashboard());
     await tester.pumpAndSettle();
@@ -65,7 +75,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No tienes próximas citas.'), findsOneWidget);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.textContaining('Por agendar  1'), findsOneWidget);
+    expect(find.textContaining('sin sincronizar'), findsNothing);
   });
 
   testWidgets('shows error and retries the dashboard request', (tester) async {
@@ -101,6 +112,10 @@ void main() {
 
 Widget _host(Widget child) => MaterialApp(
   theme: buildInkSlotTheme(),
+  builder: (context, child) => MediaQuery(
+    data: MediaQuery.of(context).copyWith(disableAnimations: true),
+    child: child!,
+  ),
   home: Scaffold(body: child),
 );
 

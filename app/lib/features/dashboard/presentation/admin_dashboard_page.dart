@@ -1,17 +1,36 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
-import '../../../core/widgets/inkslot_mono_label.dart';
+import '../../../core/widgets/inkslot_icon.dart';
+import '../../../core/widgets/inkslot_kit.dart';
+import '../../../core/widgets/inkslot_logo.dart';
+import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../admin/presentation/admin_date_format.dart';
+import '../../auth/presentation/admin_session_controller.dart';
+import '../../requests/domain/booking_request.dart';
+import '../../requests/domain/booking_request_status.dart';
+import '../../requests/presentation/booking_requests_controller.dart';
 import '../domain/admin_dashboard.dart';
 import 'admin_dashboard_controller.dart';
 
+/// Vigencia de referencia del enlace (`48 h`) para el anillo de "Por agendar".
+const _referenceLinkHours = 48;
+
 class AdminDashboardPage extends StatefulWidget {
-  const AdminDashboardPage({required this.controller, super.key});
+  const AdminDashboardPage({
+    required this.controller,
+    super.key,
+    this.sessionController,
+    this.requestsController,
+  });
 
   final AdminDashboardController controller;
+  final AdminSessionController? sessionController;
+  final BookingRequestsController? requestsController;
 
   @override
   State<AdminDashboardPage> createState() => _AdminDashboardPageState();
@@ -41,407 +60,714 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
       if (!mounted || _didLoad) return;
       _didLoad = true;
       controller.load();
+      widget.requestsController?.load(
+        refresh: true,
+        status: BookingRequestStatus.pending,
+      );
     });
   }
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(
-    animation: controller,
-    builder: (context, _) {
-      final dashboard = controller.dashboard;
-      final initialLoading =
-          controller.status == AdminDashboardStatus.loading &&
-          dashboard == null;
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
+    return InkSlotScreenIn(
+      duration: const Duration(milliseconds: 550),
+      offset: 14,
+      fromScale: 1,
+      child: AnimatedBuilder(
+        animation: Listenable.merge([
+          controller,
+          ?widget.sessionController,
+          ?widget.requestsController,
+        ]),
+        builder: (context, _) {
+          final dashboard = controller.dashboard;
+          final initialLoading =
+              controller.status == AdminDashboardStatus.loading &&
+              dashboard == null;
+          final user = widget.sessionController?.user;
+          final pending =
+              widget.requestsController?.items
+                  .where((item) => item.status == BookingRequestStatus.pending)
+                  .toList(growable: false) ??
+              const <BookingRequest>[];
 
-      return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(4, 4, 4, 32),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 980),
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              0,
+              topInset,
+              0,
+              120 + media.padding.bottom,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const _Header(),
-                const SizedBox(height: 30),
-                if (initialLoading)
-                  const _LoadingState()
-                else if (dashboard == null)
-                  _ErrorState(
-                    message:
-                        controller.errorMessage ??
-                        'No se pudo cargar el dashboard.',
-                    onRetry: () => controller.load(refresh: true),
-                  )
-                else ...[
-                  if (controller.status == AdminDashboardStatus.error &&
-                      controller.errorMessage != null) ...[
-                    _InlineError(
-                      message: controller.errorMessage!,
-                      onRetry: () => controller.load(refresh: true),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _Header(
+                        name: user?.name,
+                        onLogout: widget.sessionController?.logout,
+                      ),
+                      _Greeting(name: user?.name),
+                      if (initialLoading)
+                        const _LoadingState()
+                      else if (dashboard == null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 24),
+                          child: _ErrorState(
+                            message:
+                                controller.errorMessage ??
+                                'No se pudo cargar el dashboard.',
+                            onRetry: () => controller.load(refresh: true),
+                          ),
+                        )
+                      else ...[
+                        if (controller.status == AdminDashboardStatus.error &&
+                            controller.errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 20),
+                            child: _InlineError(
+                              message: controller.errorMessage!,
+                              onRetry: () => controller.load(refresh: true),
+                            ),
+                          ),
+                        if (dashboard.syncIssues > 0)
+                          InkSlotRise(
+                            delay: const Duration(milliseconds: 60),
+                            duration: const Duration(milliseconds: 650),
+                            offset: 16,
+                            child: _SyncBanner(dashboard: dashboard),
+                          ),
+                        InkSlotSectionHeader(
+                          title: 'Por agendar',
+                          count: dashboard.pendingRequests,
+                          titleSize: 18,
+                          titleWeight: FontWeight.w600,
+                          actionSize: 14,
+                          actionMinHeight: 44,
+                          actionLabel: 'Ver todas',
+                          onAction: () => context.go('/admin/requests'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                if (dashboard != null) ...[
+                  _PendingRow(requests: pending),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        InkSlotSectionHeader(
+                          title: 'Próximas citas',
+                          titleSize: 18,
+                          titleWeight: FontWeight.w600,
+                          actionSize: 14,
+                          actionMinHeight: 44,
+                          actionLabel: 'Ver todas',
+                          onAction: () => context.go('/admin/appointments'),
+                        ),
+                        _UpcomingCard(appointments: dashboard.nextAppointments),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                  ],
-                  _KpiGrid(dashboard: dashboard),
-                  const SizedBox(height: 34),
-                  _UpcomingAppointments(
-                    appointments: dashboard.nextAppointments,
                   ),
                 ],
               ],
             ),
-          ),
-        ),
-      );
-    },
-  );
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({required this.name, required this.onLogout});
 
-  @override
-  Widget build(BuildContext context) => const Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      InkSlotMonoLabel('Espacio de trabajo'),
-      SizedBox(height: 14),
-      Text(
-        'Inicio',
-        style: TextStyle(
-          fontFamily: 'Instrument Serif',
-          fontSize: 40,
-          color: InkSlotColors.bone,
-        ),
-      ),
-      SizedBox(height: 9),
-      Text(
-        'Una vista rápida de lo que está pasando en tu estudio.',
-        style: TextStyle(color: InkSlotColors.secondary),
-      ),
-    ],
-  );
-}
-
-class _KpiGrid extends StatelessWidget {
-  const _KpiGrid({required this.dashboard});
-
-  final AdminDashboard dashboard;
-
-  @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final cards = [
-        _KpiCard(
-          label: 'Solicitudes pendientes',
-          value: dashboard.pendingRequests,
-          icon: Icons.inbox_outlined,
-          color: InkSlotColors.copperLight,
-          route: '/admin/requests',
-        ),
-        _KpiCard(
-          label: 'Próximas citas',
-          value: dashboard.upcomingAppointments,
-          icon: Icons.event_available_outlined,
-          color: InkSlotColors.successText,
-          route: '/admin/appointments',
-        ),
-        _KpiCard(
-          label: 'Incidencias abiertas',
-          value: dashboard.syncIssues,
-          icon: Icons.sync_problem_outlined,
-          color: InkSlotColors.warningText,
-          route: '/admin/sync-issues',
-        ),
-      ];
-      if (constraints.maxWidth < 640) {
-        return Column(
-          children: [
-            for (var index = 0; index < cards.length; index++) ...[
-              cards[index],
-              if (index < cards.length - 1) const SizedBox(height: 10),
-            ],
-          ],
-        );
-      }
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          for (var index = 0; index < cards.length; index++) ...[
-            Expanded(child: cards[index]),
-            if (index < cards.length - 1) const SizedBox(width: 12),
-          ],
-        ],
-      );
-    },
-  );
-}
-
-class _KpiCard extends StatelessWidget {
-  const _KpiCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.route,
-  });
-
-  final String label;
-  final int value;
-  final IconData icon;
-  final Color color;
-  final String route;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    label: '$label: $value',
-    child: Material(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      child: InkWell(
-        onTap: () => context.go(route),
-        borderRadius: BorderRadius.circular(InkSlotRadii.card),
-        child: Container(
-          constraints: const BoxConstraints.tightFor(height: 148),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(InkSlotRadii.card),
-            border: Border.all(color: InkSlotColors.line),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, color: color, size: 21),
-                  const Spacer(),
-                  const Icon(
-                    Icons.arrow_outward,
-                    color: InkSlotColors.tertiary,
-                    size: 17,
-                  ),
-                ],
-              ),
-              const Spacer(),
-              Text(
-                '$value',
-                style: TextStyle(
-                  color: color,
-                  fontFamily: 'Instrument Serif',
-                  fontSize: 36,
-                  height: 1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: InkSlotColors.secondary,
-                  fontSize: 13,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _UpcomingAppointments extends StatelessWidget {
-  const _UpcomingAppointments({required this.appointments});
-
-  final List<DashboardAppointment> appointments;
+  final String? name;
+  final VoidCallback? onLogout;
 
   @override
   Widget build(BuildContext context) {
-    final content = appointments.isEmpty
-        ? const _EmptyState()
-        : Column(
-            children: [
-              for (var index = 0; index < appointments.length; index++) ...[
-                _AppointmentCard(appointment: appointments[index]),
-                if (index < appointments.length - 1) const SizedBox(height: 12),
-              ],
-            ],
-          );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    final trimmed = name?.trim() ?? '';
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Row(
           children: [
-            const Expanded(
-              child: Text(
-                'Próximas citas',
-                style: TextStyle(
-                  color: InkSlotColors.bone,
-                  fontFamily: 'Instrument Serif',
-                  fontSize: 28,
-                ),
+            Container(
+              width: 40,
+              height: 40,
+              decoration: const BoxDecoration(
+                color: InkSlotColors.bone,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const InkSlotLogo(size: 18, color: InkSlotColors.ink),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              'DODOGIO',
+              style: inkSlotMono(
+                size: 12,
+                color: InkSlotColors.bone,
+                spacing: .32,
               ),
             ),
-            if (appointments.isNotEmpty)
-              TextButton(
-                onPressed: () => context.go('/admin/appointments'),
-                child: const Text('Ver todas'),
-              ),
           ],
         ),
-        const SizedBox(height: 14),
-        content,
+        InkSlotPress(
+          semanticLabel: 'Cerrar sesión',
+          onTap: onLogout,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0x0FEEE9E0),
+              border: Border.all(color: InkSlotColors.line),
+            ),
+            alignment: Alignment.center,
+            child: Text(
+              trimmed.isEmpty ? 'I' : trimmed[0].toUpperCase(),
+              style: const TextStyle(
+                color: InkSlotColors.bone,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
 }
 
-class _AppointmentCard extends StatelessWidget {
-  const _AppointmentCard({required this.appointment});
+class _Greeting extends StatelessWidget {
+  const _Greeting({required this.name});
 
-  final DashboardAppointment appointment;
+  final String? name;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(18),
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.line),
-    ),
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 560;
-        final details = Column(
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final greeting = now.hour < 12
+        ? 'Buenos días'
+        : now.hour < 19
+        ? 'Buenas tardes'
+        : 'Buenas noches';
+    final trimmed = name?.trim() ?? '';
+    final first = trimmed.isEmpty ? null : trimmed.split(RegExp(r'\s+')).first;
+    return InkSlotRise(
+      duration: const Duration(milliseconds: 650),
+      offset: 16,
+      child: Padding(
+        padding: const EdgeInsets.only(top: 26),
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const InkSlotMonoLabel('Cliente'),
-            const SizedBox(height: 7),
             Text(
-              appointment.client.name,
-              style: Theme.of(context).textTheme.titleLarge,
-              overflow: TextOverflow.ellipsis,
+              longDayLabel(now).toUpperCase(),
+              style: inkSlotMono(color: InkSlotColors.tertiary),
+            ),
+            const SizedBox(height: 8),
+            Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(text: first == null ? '$greeting.' : '$greeting, '),
+                  if (first != null)
+                    TextSpan(
+                      text: '$first.',
+                      style: const TextStyle(fontStyle: FontStyle.italic),
+                    ),
+                ],
+              ),
+              style: inkSlotSerif(42),
             ),
           ],
-        );
-        final schedule = Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const InkSlotMonoLabel('Horario'),
-            const SizedBox(height: 7),
-            Text(_dateLabel(appointment.startAt)),
-            const SizedBox(height: 4),
-            Text(
-              '${appointment.durationMinutes} min · termina ${DateFormat('HH:mm').format(appointment.endAt.toLocal())}',
-              style: const TextStyle(color: InkSlotColors.secondary),
-            ),
-          ],
-        );
-        final status = Text(
-          _syncLabel(appointment.syncStatus),
-          style: const TextStyle(
-            color: InkSlotColors.successText,
-            fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
+/// Banner de incidencias de sincronización (tono aviso).
+class _SyncBanner extends StatelessWidget {
+  const _SyncBanner({required this.dashboard});
+
+  final AdminDashboard dashboard;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = dashboard.syncIssues;
+    final affected = dashboard.nextAppointments
+        .where((appointment) => appointment.syncStatus != 'synced')
+        .firstOrNull;
+    final subtitle = affected == null
+        ? 'Revisa los eventos pendientes de Google Calendar.'
+        : '${affected.client.name} · '
+              '${shortDayLabel(affected.startAt.toLocal())}';
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: InkSlotPress(
+        semanticLabel:
+            '$count ${count == 1 ? 'cita sin sincronizar' : 'citas sin sincronizar'}',
+        onTap: () => context.go('/admin/sync-issues'),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: const Color(0x14E6C77A),
+            borderRadius: BorderRadius.circular(InkSlotRadii.card),
+            border: Border.all(color: const Color(0x38E6C77A)),
           ),
-        );
-        if (compact) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
             children: [
-              details,
-              const SizedBox(height: 16),
-              schedule,
-              const SizedBox(height: 14),
-              status,
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: Color(0x29E6C77A),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: const InkSlotIcon(
+                  InkSlotIcons.sincronizar,
+                  size: 18,
+                  color: InkSlotColors.warningText,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$count ${count == 1 ? 'cita sin sincronizar' : 'citas sin sincronizar'}',
+                      style: const TextStyle(
+                        color: InkSlotColors.bone,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: Color(0xFFBDB4A3),
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              const InkSlotIcon(
+                InkSlotIcons.avanzar,
+                size: 16,
+                color: InkSlotColors.ash,
+              ),
             ],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(flex: 3, child: details),
-            const SizedBox(width: 24),
-            Expanded(flex: 4, child: schedule),
-            const SizedBox(width: 24),
-            status,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingRow extends StatelessWidget {
+  const _PendingRow({required this.requests});
+
+  final List<BookingRequest> requests;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (final request in requests) ...[
+            _PendingCard(request: request),
+            const SizedBox(width: 12),
           ],
-        );
-      },
+          const _NewRequestCard(),
+        ],
+      ),
     ),
   );
+}
+
+class _PendingCard extends StatelessWidget {
+  const _PendingCard({required this.request});
+
+  final BookingRequest request;
+
+  @override
+  Widget build(BuildContext context) {
+    final hoursLeft =
+        (_referenceLinkHours -
+                DateTime.now().difference(request.createdAt).inMinutes / 60)
+            .ceil()
+            .clamp(0, _referenceLinkHours);
+    final channel = request.client.contactChannel;
+    return InkSlotPress(
+      onTap: () => context.go('/admin/requests/${request.id}'),
+      child: SizedBox(
+        width: 220,
+        child: InkSlotCard(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _VigencyRing(hoursLeft: hoursLeft),
+                  const InkSlotPill('Pendiente', tone: InkSlotPillTone.pending),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                request.client.name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: InkSlotColors.bone,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                [
+                  durationLabel(request.durationMinutes),
+                  ?channel?.displayName,
+                ].join(' · '),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: InkSlotColors.ash, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+extension on ContactChannel {
+  String get displayName => switch (this) {
+    ContactChannel.whatsapp => 'WhatsApp',
+    ContactChannel.instagram => 'Instagram',
+    ContactChannel.email => 'Correo',
+    ContactChannel.phone => 'Teléfono',
+  };
+}
+
+/// `.ring`: anillo de vigencia (cobre; aviso por debajo de 12 h).
+class _VigencyRing extends StatelessWidget {
+  const _VigencyRing({required this.hoursLeft});
+
+  final int hoursLeft;
+
+  @override
+  Widget build(BuildContext context) {
+    final fraction = hoursLeft / _referenceLinkHours;
+    final color = hoursLeft < 12 ? InkSlotColors.warning : InkSlotColors.copper;
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: fraction),
+      duration: inkSlotReduceMotion(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 900),
+      curve: InkSlotMotion.standard,
+      builder: (context, value, _) => Semantics(
+        label: 'Vigencia: $hoursLeft h',
+        child: ExcludeSemantics(
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: CustomPaint(
+              painter: _RingPainter(fraction: value, color: color),
+              child: Center(
+                child: Text(
+                  '${hoursLeft}h',
+                  style: const TextStyle(
+                    fontFamily: 'Geist Mono',
+                    fontSize: 11,
+                    color: InkSlotColors.bone,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  const _RingPainter({required this.fraction, required this.color});
+
+  final double fraction;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Rect.fromCircle(center: size.center(Offset.zero), radius: 20);
+    canvas.drawArc(
+      rect,
+      0,
+      math.pi * 2,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..color = const Color(0x1AEEE9E0),
+    );
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      math.pi * 2 * fraction,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round
+        ..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_RingPainter oldDelegate) =>
+      oldDelegate.fraction != fraction || oldDelegate.color != color;
+}
+
+class _NewRequestCard extends StatelessWidget {
+  const _NewRequestCard();
+
+  @override
+  Widget build(BuildContext context) => InkSlotPress(
+    onTap: () => context.go('/admin/requests/new'),
+    child: SizedBox(
+      width: 140,
+      child: CustomPaint(
+        foregroundPainter: const _DashedRRectPainter(),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(color: const Color(0x33EEE9E0)),
+                ),
+                alignment: Alignment.center,
+                child: const InkSlotIcon(
+                  InkSlotIcons.mas,
+                  size: 18,
+                  color: InkSlotColors.bone,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Nueva solicitud',
+                style: TextStyle(color: InkSlotColors.secondary, fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _DashedRRectPainter extends CustomPainter {
+  const _DashedRRectPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          (Offset.zero & size).deflate(.5),
+          const Radius.circular(InkSlotRadii.card),
+        ),
+      );
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = InkSlotColors.lineStrong;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(metric.extractPath(distance, distance + 4), paint);
+        distance += 8;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRRectPainter oldDelegate) => false;
+}
+
+class _UpcomingCard extends StatelessWidget {
+  const _UpcomingCard({required this.appointments});
+
+  final List<DashboardAppointment> appointments;
+
+  @override
+  Widget build(BuildContext context) {
+    if (appointments.isEmpty) {
+      return const InkSlotCard(
+        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 36),
+        child: Text(
+          'No tienes próximas citas.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: InkSlotColors.tertiary, fontSize: 14),
+        ),
+      );
+    }
+    return InkSlotCard(
+      child: Column(
+        children: [
+          for (var i = 0; i < appointments.length; i++)
+            _AppointmentRow(
+              appointment: appointments[i],
+              last: i == appointments.length - 1,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AppointmentRow extends StatelessWidget {
+  const _AppointmentRow({required this.appointment, required this.last});
+
+  final DashboardAppointment appointment;
+  final bool last;
+
+  @override
+  Widget build(BuildContext context) {
+    final start = appointment.startAt.toLocal();
+    final end = appointment.endAt.toLocal();
+    final (color, label, pulse) = switch (appointment.syncStatus) {
+      'synced' => (InkSlotColors.success, 'Calendar: sincronizado', false),
+      'pending' => (InkSlotColors.warning, 'Calendar: pendiente', true),
+      'failed' => (InkSlotColors.error, 'Calendar: requiere atención', true),
+      _ => (InkSlotColors.tertiary, 'Calendar: estado desconocido', false),
+    };
+    final dot = Container(
+      width: 8,
+      height: 8,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+    return InkSlotPress(
+      onTap: () => context.go('/admin/appointments'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          border: last
+              ? null
+              : const Border(bottom: BorderSide(color: Color(0x0FEEE9E0))),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 56,
+              decoration: BoxDecoration(
+                color: InkSlotColors.surfaceTwo,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    weekdayShort(start),
+                    style: inkSlotMono(size: 9, color: InkSlotColors.ash),
+                  ),
+                  Text(
+                    '${start.day}',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: inkSlotSerif(26),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appointment.client.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: InkSlotColors.bone,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${clockLabel(start)} – ${clockLabel(end)} · '
+                    '${durationLabel(appointment.durationMinutes)}',
+                    style: const TextStyle(
+                      color: InkSlotColors.ash,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Semantics(
+              label: label,
+              child: pulse ? InkSlotPulse(minOpacity: .35, child: dot) : dot,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Row(
-        children: List.generate(
-          3,
-          (index) => Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(left: index == 0 ? 0 : 6),
-              child: _LoadingCard(height: 132),
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(height: 34),
-      const _LoadingCard(height: 120),
-      const SizedBox(height: 12),
-      const _LoadingCard(height: 120),
-    ],
-  );
-}
-
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard({required this.height});
-
-  final double height;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    height: height,
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.line),
-    ),
-    child: const Center(
-      child: SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      ),
-    ),
-  );
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 42),
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.line),
-    ),
-    child: const Column(
+  Widget build(BuildContext context) => InkSlotPulse(
+    minOpacity: .5,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Icon(
-          Icons.event_available_outlined,
-          size: 38,
-          color: InkSlotColors.copperLight,
+        const SizedBox(height: 28),
+        InkSlotCard(child: const SizedBox(height: 86)),
+        const SizedBox(height: 40),
+        Row(
+          children: [
+            Expanded(child: InkSlotCard(child: const SizedBox(height: 144))),
+            const SizedBox(width: 12),
+            Expanded(child: InkSlotCard(child: const SizedBox(height: 144))),
+          ],
         ),
-        SizedBox(height: 14),
-        Text(
-          'No tienes próximas citas.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: InkSlotColors.secondary),
-        ),
+        const SizedBox(height: 40),
+        InkSlotCard(child: const SizedBox(height: 170)),
       ],
     ),
   );
@@ -454,13 +780,9 @@ class _ErrorState extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.error.withValues(alpha: .35)),
-    ),
+  Widget build(BuildContext context) => InkSlotCard(
+    padding: const EdgeInsets.all(22),
+    borderColor: const Color(0x40E2604C),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -479,33 +801,32 @@ class _InlineError extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      color: InkSlotColors.error.withValues(alpha: .08),
-      borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-      border: Border.all(color: InkSlotColors.error.withValues(alpha: .28)),
-    ),
+  Widget build(BuildContext context) => InkSlotCard(
+    padding: const EdgeInsets.fromLTRB(18, 8, 8, 8),
+    color: const Color(0x14E2604C),
+    borderColor: const Color(0x40E2604C),
     child: Row(
       children: [
         Expanded(
           child: Text(
             message,
-            style: const TextStyle(color: InkSlotColors.errorText),
+            style: const TextStyle(
+              color: InkSlotColors.errorText,
+              fontSize: 14,
+            ),
           ),
         ),
-        TextButton(onPressed: onRetry, child: const Text('Reintentar')),
+        InkSlotPress(
+          onTap: onRetry,
+          child: const Padding(
+            padding: EdgeInsets.all(14),
+            child: Text(
+              'Reintentar',
+              style: TextStyle(color: InkSlotColors.bone, fontSize: 14),
+            ),
+          ),
+        ),
       ],
     ),
   );
 }
-
-String _dateLabel(DateTime value) =>
-    DateFormat('dd/MM/yyyy · HH:mm').format(value.toLocal());
-
-String _syncLabel(String status) => switch (status) {
-  'synced' => 'Calendar: sincronizado',
-  'pending' => 'Calendar: pendiente',
-  'failed' => 'Calendar: requiere atención',
-  _ => 'Calendar: estado desconocido',
-};

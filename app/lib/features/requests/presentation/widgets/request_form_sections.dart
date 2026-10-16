@@ -1,41 +1,36 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/inkslot_tokens.dart';
-import '../../../../core/widgets/inkslot_mono_label.dart';
+import '../../../../core/widgets/inkslot_icon.dart';
+import '../../../../core/widgets/inkslot_kit.dart';
+import '../../../../core/widgets/inkslot_motion.dart';
+import '../../../admin/presentation/admin_date_format.dart';
+import '../../../admin/presentation/admin_motion.dart';
 
+/// Bloque numerado del formulario: etiqueta mono (`01 · Cliente`) y contenido.
 class RequestSection extends StatelessWidget {
-  const RequestSection({
-    required this.label,
-    required this.title,
-    required this.child,
-    super.key,
-  });
+  const RequestSection({required this.label, required this.child, super.key});
 
   final String label;
-  final String title;
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(22),
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.line),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        InkSlotMonoLabel(label, color: InkSlotColors.copperLight),
-        const SizedBox(height: 8),
-        Text(title, style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 20),
-        child,
-      ],
-    ),
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(top: 28, bottom: 12),
+        child: Text(
+          label.toUpperCase(),
+          style: inkSlotMono(color: InkSlotColors.tertiary),
+        ),
+      ),
+      child,
+    ],
   );
 }
 
+/// Duración con pasos de 30 min y atajos (`1 h … 6 h`).
 class RequestDurationField extends StatelessWidget {
   const RequestDurationField({
     required this.value,
@@ -49,67 +44,78 @@ class RequestDurationField extends StatelessWidget {
   final bool enabled;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Row(
-        children: [
-          _StepButton(
-            icon: Icons.remove,
-            label: 'Reducir duración',
-            enabled: enabled && value > 30,
-            onPressed: () => onChanged((value - 30).clamp(30, 600)),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  _durationLabel(value),
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: InkSlotColors.cream,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                const Text(
-                  'duración de la sesión',
-                  style: TextStyle(
-                    color: InkSlotColors.secondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          _StepButton(
-            icon: Icons.add,
-            label: 'Aumentar duración',
-            enabled: enabled && value < 600,
-            onPressed: () => onChanged((value + 30).clamp(30, 600)),
-          ),
-        ],
-      ),
-      const SizedBox(height: 16),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [60, 120, 180, 240, 360]
-            .map(
-              (minutes) => _ChoiceChip(
-                label: _durationLabel(minutes),
-                selected: value == minutes,
-                enabled: enabled,
-                onPressed: () => onChanged(minutes),
+  Widget build(BuildContext context) {
+    const secondary = TextStyle(color: InkSlotColors.secondary, fontSize: 15);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkSlotCard(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _StepButton(
+                icon: InkSlotIcons.menos,
+                label: 'Restar 30 minutos',
+                enabled: enabled && value > 30,
+                onPressed: () => onChanged((value - 30).clamp(30, 600)),
               ),
-            )
-            .toList(growable: false),
-      ),
-    ],
-  );
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: AdminTok(
+                    token: value,
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '${value ~/ 60}',
+                            style: inkSlotSerif(44),
+                          ),
+                          const TextSpan(text: ' h ', style: secondary),
+                          TextSpan(
+                            text: (value % 60).toString().padLeft(2, '0'),
+                            style: inkSlotSerif(44),
+                          ),
+                          const TextSpan(text: ' min', style: secondary),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              ),
+              _StepButton(
+                icon: InkSlotIcons.mas,
+                label: 'Sumar 30 minutos',
+                enabled: enabled && value < 600,
+                onPressed: () => onChanged((value + 30).clamp(30, 600)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              for (final minutes in const [60, 120, 180, 240, 360]) ...[
+                InkSlotChip(
+                  label: durationLabel(minutes),
+                  selected: value == minutes,
+                  onTap: enabled ? () => onChanged(minutes) : null,
+                ),
+                if (minutes != 360) const SizedBox(width: 12),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 }
 
+/// Interruptor "Anticipo verificado" con su descripción.
 class DepositConfirmationField extends StatelessWidget {
   const DepositConfirmationField({
     required this.value,
@@ -128,56 +134,52 @@ class DepositConfirmationField extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      Semantics(
-        container: true,
-        label: 'Confirmación de anticipo',
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: value,
-              onChanged: enabled ? (next) => onChanged(next ?? false) : null,
-              activeColor: InkSlotColors.copper,
-              checkColor: InkSlotColors.ink,
-            ),
-            const SizedBox(width: 8),
-            const Expanded(
-              child: Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Anticipo recibido y verificado',
-                      style: TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      'El enlace solo se podrá usar cuando el anticipo esté confirmado.',
-                      style: TextStyle(
-                        color: InkSlotColors.secondary,
-                        fontSize: 13,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
+      Row(
+        children: [
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Anticipo verificado',
+                  style: TextStyle(
+                    color: InkSlotColors.bone,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
+                SizedBox(height: 3),
+                Text(
+                  'Confirmo que el pago ya llegó por un canal externo.',
+                  style: TextStyle(
+                    color: Color(0xFF9B968E),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 14),
+          InkSlotSwitch(
+            value: value,
+            semanticLabel: 'Anticipo verificado',
+            onChanged: enabled ? onChanged : null,
+          ),
+        ],
       ),
       if (error != null) ...[
-        const SizedBox(height: 4),
+        const SizedBox(height: 8),
         Text(
           error!,
-          style: const TextStyle(color: InkSlotColors.errorText, fontSize: 12),
+          style: const TextStyle(color: InkSlotColors.errorText, fontSize: 13),
         ),
       ],
     ],
   );
 }
 
+/// Vigencia del enlace (`24 h · 48 h · 72 h`).
 class RequestTtlField extends StatelessWidget {
   const RequestTtlField({
     required this.value,
@@ -190,41 +192,19 @@ class RequestTtlField extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final bool enabled;
 
+  static const options = [24, 48, 72];
+
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      const Text(
-        'Vigencia del enlace',
-        style: TextStyle(
-          color: InkSlotColors.cream,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      const SizedBox(height: 5),
-      const Text(
-        'Después de este tiempo, el cliente ya no podrá reservar.',
-        style: TextStyle(color: InkSlotColors.secondary, fontSize: 13),
-      ),
-      const SizedBox(height: 14),
-      Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [24, 48, 72]
-            .map(
-              (hours) => _ChoiceChip(
-                label: '$hours h',
-                selected: value == hours,
-                enabled: enabled,
-                onPressed: () => onChanged(hours),
-              ),
-            )
-            .toList(growable: false),
-      ),
-    ],
+  Widget build(BuildContext context) => InkSlotSegmented(
+    labels: [for (final hours in options) '$hours h'],
+    selected: options.indexOf(value).clamp(0, options.length - 1),
+    onChanged: (index) {
+      if (enabled) onChanged(options[index]);
+    },
   );
 }
 
+/// Días permitidos: siete chips (`L M X J V S D`).
 class RequestDaysField extends StatelessWidget {
   const RequestDaysField({
     required this.values,
@@ -240,28 +220,69 @@ class RequestDaysField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const days = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: List.generate(days.length, (index) {
-        final selected = values.contains(index + 1);
-        return _ChoiceChip(
-          label: days[index],
-          selected: selected,
-          enabled: enabled,
-          onPressed: () {
-            final next = {...values};
-            if (selected) {
-              next.remove(index + 1);
-            } else {
-              next.add(index + 1);
-            }
-            onChanged(next);
-          },
-        );
-      }),
+    return Row(
+      children: [
+        for (var index = 0; index < days.length; index++) ...[
+          if (index > 0) const SizedBox(width: 6),
+          Expanded(
+            child: _DayChip(
+              label: days[index],
+              selected: values.contains(index + 1),
+              onTap: enabled
+                  ? () {
+                      final next = {...values};
+                      if (!next.add(index + 1)) next.remove(index + 1);
+                      onChanged(next);
+                    }
+                  : null,
+            ),
+          ),
+        ],
+      ],
     );
   }
+}
+
+class _DayChip extends StatelessWidget {
+  const _DayChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    selected: selected,
+    child: InkSlotPress(
+      onTap: onTap,
+      semanticLabel: label,
+      child: ExcludeSemantics(
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          height: 42,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? InkSlotColors.bone : Colors.transparent,
+            borderRadius: BorderRadius.circular(InkSlotRadii.chip),
+            border: Border.all(
+              color: selected ? InkSlotColors.bone : const Color(0x24EEE9E0),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              color: selected ? InkSlotColors.ink : InkSlotColors.bone,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _StepButton extends StatelessWidget {
@@ -272,65 +293,28 @@ class _StepButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  final IconData icon;
+  final InkSlotIcons icon;
   final String label;
   final bool enabled;
   final VoidCallback onPressed;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    label: label,
-    child: IconButton.filledTonal(
-      onPressed: enabled ? onPressed : null,
-      icon: Icon(icon),
-      tooltip: label,
-      style: IconButton.styleFrom(
-        foregroundColor: InkSlotColors.copperLight,
-        backgroundColor: InkSlotColors.tobacco,
-        minimumSize: const Size(44, 44),
+  Widget build(BuildContext context) => Opacity(
+    opacity: enabled ? 1 : .3,
+    child: InkSlotPress(
+      semanticLabel: label,
+      onTap: enabled ? onPressed : null,
+      child: Container(
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: const Color(0x0FEEE9E0),
+          border: Border.all(color: InkSlotColors.line),
+        ),
+        alignment: Alignment.center,
+        child: InkSlotIcon(icon, size: 18, color: InkSlotColors.bone),
       ),
     ),
   );
-}
-
-class _ChoiceChip extends StatelessWidget {
-  const _ChoiceChip({
-    required this.label,
-    required this.selected,
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  final String label;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    selected: selected,
-    label: label,
-    child: FilterChip(
-      label: Text(label),
-      selected: selected,
-      onSelected: enabled ? (_) => onPressed() : null,
-      showCheckmark: false,
-      side: const BorderSide(color: InkSlotColors.lineStrong),
-      selectedColor: InkSlotColors.tobacco,
-      backgroundColor: InkSlotColors.field,
-      labelStyle: TextStyle(
-        color: selected ? InkSlotColors.copperLight : InkSlotColors.secondary,
-        fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-      ),
-    ),
-  );
-}
-
-String _durationLabel(int minutes) {
-  final hours = minutes ~/ 60;
-  final remainder = minutes % 60;
-  if (remainder == 0) return '$hours h';
-  return '$hours h $remainder min';
 }
