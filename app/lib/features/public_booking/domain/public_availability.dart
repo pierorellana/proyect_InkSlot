@@ -49,9 +49,6 @@ class AvailabilityDay {
       if (!slots[index - 1].startAt.isBefore(slots[index].startAt)) {
         throw const FormatException('Los horarios no están ordenados.');
       }
-      if (slots[index - 1].endAt.isAfter(slots[index].startAt)) {
-        throw const FormatException('Los horarios se superponen.');
-      }
     }
     return AvailabilityDay(date: date, slots: slots);
   }

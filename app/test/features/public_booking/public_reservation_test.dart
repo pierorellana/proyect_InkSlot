@@ -68,4 +68,27 @@ void main() {
     expect(availability.days.single.date.isUtc, isFalse);
     expect(availability.days.single.slots.single.startAt.isUtc, isTrue);
   });
+
+  test('accepts overlapping start-time alternatives for a longer session', () {
+    final availability = PublicAvailability.fromJson(<String, dynamic>{
+      'timezone': 'America/Guayaquil',
+      'days': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'date': '2026-10-23',
+          'slots': <Map<String, String>>[
+            <String, String>{
+              'startAt': '2026-10-23T15:00:00.000Z',
+              'endAt': '2026-10-23T16:00:00.000Z',
+            },
+            <String, String>{
+              'startAt': '2026-10-23T15:30:00.000Z',
+              'endAt': '2026-10-23T16:30:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(availability.days.single.slots, hasLength(2));
+  });
 }
