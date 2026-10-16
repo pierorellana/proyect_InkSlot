@@ -2,6 +2,8 @@
 
 > **Para agentes de implementación:** ejecutar una tarea a la vez, mantener las casillas actualizadas y cerrar cada tarea con un commit Conventional Commit enfocado.
 
+**Estado de ejecución:** completado el 2026-10-16. Las seis tareas fueron implementadas, verificadas y sus cambios quedaron registrados en commits enfocados.
+
 **Objetivo:** entregar T-016 como un slice vertical API NestJS que permita consultar citas del artista, reprogramarlas, cancelarlas, completarlas y marcarlas como no-show, manteniendo PostgreSQL como fuente de verdad y sincronizando update/delete con Google Calendar mediante el outbox de T-014.
 
 **Arquitectura:** extender el contrato Calendar existente y el worker local de T-014 para tres operaciones (`create`, `update`, `delete`). Añadir el módulo administrativo de citas dentro de `AppointmentsModule`, con DTOs estrictos, cursor por `startAt/id`, servicio de disponibilidad para reprogramación y transacciones PostgreSQL `Serializable` con control optimista por `Appointment.version`. No se crea otro worker, cola, servicio externo ni migración.
