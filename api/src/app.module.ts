@@ -9,6 +9,7 @@ import { CalendarModule } from './calendar/calendar.module';
 import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
 import { RequestsModule } from './requests/requests.module';
+import { SyncModule } from './sync/sync.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { RequestsModule } from './requests/requests.module';
     CalendarModule,
     RequestsModule,
     AppointmentsModule,
+    SyncModule,
     HealthModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],

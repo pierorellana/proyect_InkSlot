@@ -1,5 +1,6 @@
 export const SYNC_CONFIG = Symbol('SYNC_CONFIG');
 export const OUTBOX_EVENT_PROCESSOR = Symbol('OUTBOX_EVENT_PROCESSOR');
+export const SCHEDULER_REGISTRY = Symbol('SCHEDULER_REGISTRY');
 export const OUTBOX_WORKER_INTERVAL = 'OUTBOX_WORKER_INTERVAL';
 export const OUTBOX_CREATE_EVENT = 'appointment.calendar.create';
 
@@ -35,6 +36,9 @@ export type SyncFailure = {
   retryable: boolean;
 };
 
-export type OutboxEventProcessor = (
-  event: ClaimedOutboxEvent,
-) => Promise<void>;
+export type OutboxEventProcessor = (event: ClaimedOutboxEvent) => Promise<void>;
+
+export type SchedulerRegistryPort = {
+  addInterval(name: string, interval: NodeJS.Timeout): void;
+  deleteInterval(name: string): void;
+};

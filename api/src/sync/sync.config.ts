@@ -28,11 +28,7 @@ const parseInteger = (
   }
 
   const value = Number(normalized);
-  if (
-    !Number.isSafeInteger(value) ||
-    value < minimum ||
-    value > maximum
-  ) {
+  if (!Number.isSafeInteger(value) || value < minimum || value > maximum) {
     throw new Error(`${name} must be between ${minimum} and ${maximum}`);
   }
 
@@ -89,7 +85,9 @@ export const readSyncConfig = (
   );
 
   if (retryMaxMs < retryBaseMs) {
-    throw new Error('OUTBOX_RETRY_MAX_MS must be greater than or equal to OUTBOX_RETRY_BASE_MS');
+    throw new Error(
+      'OUTBOX_RETRY_MAX_MS must be greater than or equal to OUTBOX_RETRY_BASE_MS',
+    );
   }
 
   return {
