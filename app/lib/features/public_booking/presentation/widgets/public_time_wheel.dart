@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/theme/inkslot_tokens.dart';
@@ -65,65 +66,85 @@ class _PublicTimeWheelState extends State<PublicTimeWheel> {
       container: true,
       explicitChildNodes: true,
       label: 'Horarios disponibles en ${widget.timezone}',
-      child: Column(
-        children: [
-          IconButton(
-            onPressed: _selectedIndex == 0
-                ? null
-                : () => _moveBy(-1, reduceMotion),
-            icon: const Icon(Icons.keyboard_arrow_up_rounded),
-            tooltip: 'Horario anterior',
-            constraints: const BoxConstraints(
-              minWidth: InkSlotSpacing.minimumTapTarget,
-              minHeight: InkSlotSpacing.minimumTapTarget,
-            ),
-          ),
-          SizedBox(
-            height: 268,
-            child: ListWheelScrollView.useDelegate(
-              controller: _scrollController,
-              itemExtent: 78,
-              diameterRatio: 1.65,
-              perspective: 0.003,
-              physics: const FixedExtentScrollPhysics(),
-              onSelectedItemChanged: (index) {
-                if (index < 0 || index >= widget.slots.length) return;
-                setState(() => _selectedIndex = index);
-                widget.onSelected(widget.slots[index]);
-              },
-              childDelegate: ListWheelChildBuilderDelegate(
-                childCount: widget.slots.length,
-                builder: (context, index) {
-                  return _WheelSlotTile(
-                    slot: widget.slots[index],
-                    timezone: widget.timezone,
-                    distance: index - _selectedIndex,
-                    selected: index == _selectedIndex,
-                    reduceMotion: reduceMotion,
-                    onTap: () => _moveTo(index, reduceMotion),
-                  );
-                },
+      child: Focus(
+        autofocus: true,
+        onKeyEvent: (node, event) {
+          if (event is! KeyDownEvent) return KeyEventResult.ignored;
+          if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+            _moveBy(-1, reduceMotion);
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+            _moveBy(1, reduceMotion);
+            return KeyEventResult.handled;
+          }
+          if (event.logicalKey == LogicalKeyboardKey.enter ||
+              event.logicalKey == LogicalKeyboardKey.space) {
+            _jumpTo(_selectedIndex);
+            return KeyEventResult.handled;
+          }
+          return KeyEventResult.ignored;
+        },
+        child: Column(
+          children: [
+            IconButton(
+              onPressed: _selectedIndex == 0
+                  ? null
+                  : () => _moveBy(-1, reduceMotion),
+              icon: const Icon(Icons.keyboard_arrow_up_rounded),
+              tooltip: 'Horario anterior',
+              constraints: const BoxConstraints(
+                minWidth: InkSlotSpacing.minimumTapTarget,
+                minHeight: InkSlotSpacing.minimumTapTarget,
               ),
             ),
-          ),
-          Semantics(
-            liveRegion: true,
-            label:
-                '${_formatSlotTime(widget.slots[_selectedIndex].startAt, widget.timezone)}, seleccionado',
-            child: const SizedBox(width: 1, height: 1),
-          ),
-          IconButton(
-            onPressed: _selectedIndex == widget.slots.length - 1
-                ? null
-                : () => _moveBy(1, reduceMotion),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-            tooltip: 'Siguiente horario',
-            constraints: const BoxConstraints(
-              minWidth: InkSlotSpacing.minimumTapTarget,
-              minHeight: InkSlotSpacing.minimumTapTarget,
+            SizedBox(
+              height: 268,
+              child: ListWheelScrollView.useDelegate(
+                controller: _scrollController,
+                itemExtent: 78,
+                diameterRatio: 1.65,
+                perspective: 0.003,
+                physics: const FixedExtentScrollPhysics(),
+                onSelectedItemChanged: (index) {
+                  if (index < 0 || index >= widget.slots.length) return;
+                  setState(() => _selectedIndex = index);
+                  widget.onSelected(widget.slots[index]);
+                },
+                childDelegate: ListWheelChildBuilderDelegate(
+                  childCount: widget.slots.length,
+                  builder: (context, index) {
+                    return _WheelSlotTile(
+                      slot: widget.slots[index],
+                      timezone: widget.timezone,
+                      distance: index - _selectedIndex,
+                      selected: index == _selectedIndex,
+                      reduceMotion: reduceMotion,
+                      onTap: () => _moveTo(index, reduceMotion),
+                    );
+                  },
+                ),
+              ),
             ),
-          ),
-        ],
+            Semantics(
+              liveRegion: true,
+              label:
+                  '${_formatSlotTime(widget.slots[_selectedIndex].startAt, widget.timezone)}, seleccionado',
+              child: const SizedBox(width: 1, height: 1),
+            ),
+            IconButton(
+              onPressed: _selectedIndex == widget.slots.length - 1
+                  ? null
+                  : () => _moveBy(1, reduceMotion),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              tooltip: 'Siguiente horario',
+              constraints: const BoxConstraints(
+                minWidth: InkSlotSpacing.minimumTapTarget,
+                minHeight: InkSlotSpacing.minimumTapTarget,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
