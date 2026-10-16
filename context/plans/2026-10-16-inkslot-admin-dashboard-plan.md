@@ -2,6 +2,8 @@
 
 > **Para agentes de implementación:** ejecutar una tarea a la vez, mantener las casillas actualizadas y cerrar cada tarea con un commit Conventional Commit enfocado.
 
+**Estado de ejecución:** completado el 2026-10-16. Las siete tareas fueron implementadas, verificadas y registradas en commits enfocados.
+
 **Objetivo:** entregar T-017 como un slice vertical con dashboard administrativo real, incidencias operables y filtros persistentes de Solicitudes/Citas en Flutter Web.
 
 **Arquitectura:** NestJS expondrá `GET /v1/admin/dashboard` como una proyección read-only scoped por `artistId`; las incidencias conservarán sus endpoints existentes. Flutter añadirá modelos, repositorios y `ChangeNotifier` por feature, integrados en el `AdminShell` responsive. Los filtros vivirán en los controllers para sobrevivir al cambio de rutas durante la sesión.
