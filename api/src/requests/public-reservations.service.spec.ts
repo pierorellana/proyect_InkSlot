@@ -185,6 +185,47 @@ describe('BookingRequestsService public resolution', () => {
     });
   });
 
+  it('returns the isolated context required by public availability', async () => {
+    await expect(
+      service.resolvePublicAvailabilityContext(rawToken),
+    ).resolves.toEqual({
+      requestId,
+      artistId,
+      status: 'pending',
+      durationMinutes: 180,
+      timezone: 'America/Guayaquil',
+      expiresAt: new Date('2026-10-17T12:00:00.000Z'),
+      minDate: '2026-10-20',
+      maxDate: '2026-11-30',
+      allowedWeekdays: [2, 3, 4, 5, 6],
+      allowedWindows: [{ startLocal: '10:00', endLocal: '20:00' }],
+    });
+
+    const result = await service.resolvePublicAvailabilityContext(rawToken);
+    const serialized = JSON.stringify(result);
+    for (const privateValue of [
+      'clientId',
+      'private-payment-reference',
+      tokenId,
+      tokenHash,
+      rawToken,
+    ]) {
+      expect(serialized).not.toContain(privateValue);
+    }
+  });
+
+  it('rejects availability context for booked requests', async () => {
+    const booked = record();
+    booked.request.status = BookingRequestStatus.BOOKED;
+    bookingToken.findUnique.mockResolvedValue(booked);
+
+    await expectCode(
+      service.resolvePublicAvailabilityContext(rawToken),
+      'ALREADY_BOOKED',
+      409,
+    );
+  });
+
   it('keeps a booked result readable after token consumption and expiry', async () => {
     const booked = record();
     booked.request.status = BookingRequestStatus.BOOKED;
@@ -223,6 +264,19 @@ describe('BookingRequestsService public resolution', () => {
       where: { id: requestId, status: BookingRequestStatus.PENDING },
       data: { status: BookingRequestStatus.EXPIRED, version: { increment: 1 } },
     });
+  });
+
+  it('applies pending token lifecycle errors to the availability context', async () => {
+    const expired = record();
+    expired.expiresAt = new Date('2026-10-15T11:59:59.000Z');
+    bookingToken.findUnique.mockResolvedValue(expired);
+
+    await expectCode(
+      service.resolvePublicAvailabilityContext(rawToken),
+      'TOKEN_EXPIRED',
+      410,
+    );
+    expect(bookingRequest.updateMany).toHaveBeenCalled();
   });
 
   it('does not expire the request when a newer active replacement exists', async () => {
@@ -279,6 +333,40 @@ describe('BookingRequestsService public resolution', () => {
     bookingToken.findUnique.mockResolvedValue(value);
 
     await expectCode(service.resolvePublic(rawToken), code, 410);
+  });
+
+  it.each([
+    [
+      'revoked token',
+      (value: PublicTokenRecord) => {
+        value.revokedAt = now;
+      },
+      'TOKEN_REVOKED',
+    ],
+    [
+      'consumed token',
+      (value: PublicTokenRecord) => {
+        value.consumedAt = now;
+      },
+      'TOKEN_REVOKED',
+    ],
+    [
+      'cancelled request',
+      (value: PublicTokenRecord) => {
+        value.request.status = BookingRequestStatus.CANCELLED;
+      },
+      'TOKEN_REVOKED',
+    ],
+  ])('rejects availability context for %s', async (_label, mutate, code) => {
+    const value = record();
+    mutate(value);
+    bookingToken.findUnique.mockResolvedValue(value);
+
+    await expectCode(
+      service.resolvePublicAvailabilityContext(rawToken),
+      code,
+      410,
+    );
   });
 
   it('requires studio settings for an active token', async () => {

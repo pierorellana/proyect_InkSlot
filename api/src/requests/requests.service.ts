@@ -109,6 +109,19 @@ export type PublicReservationResponse = {
   expiresAt: string;
 };
 
+export type PublicAvailabilityContext = {
+  requestId: string;
+  artistId: string;
+  status: 'pending';
+  durationMinutes: number;
+  timezone: string;
+  expiresAt: Date;
+  minDate: string | null;
+  maxDate: string | null;
+  allowedWeekdays: number[] | null;
+  allowedWindows: Array<{ startLocal: string; endLocal: string }> | null;
+};
+
 const safeError = (code: string, message: string) => ({
   error: { code, message },
 });
@@ -411,9 +424,68 @@ export class BookingRequestsService {
   }
 
   async resolvePublic(token: string): Promise<PublicReservationResponse> {
-    let record: PublicTokenRecord | null;
+    const record = await this.findPublicToken(token);
+
+    const request = record.request;
+    this.assertPublicTokenNotRevoked(record);
+    const timezone = this.publicTimezone(record);
+
+    // A booked request remains safely readable even after its token has been
+    // consumed or its original TTL has elapsed. The request state is the
+    // source of truth for this already-reserved outcome.
+    if (request.status === BookingRequestStatus.BOOKED) {
+      return this.toPublicResponse(
+        request,
+        timezone,
+        record.expiresAt,
+        'booked',
+      );
+    }
+
+    await this.assertPendingPublicTokenActive(record);
+
+    return this.toPublicResponse(
+      request,
+      timezone,
+      record.expiresAt,
+      'pending',
+    );
+  }
+
+  async resolvePublicAvailabilityContext(
+    token: string,
+  ): Promise<PublicAvailabilityContext> {
+    const record = await this.findPublicToken(token);
+    const request = record.request;
+
+    this.assertPublicTokenNotRevoked(record);
+    const timezone = this.publicTimezone(record);
+
+    if (request.status === BookingRequestStatus.BOOKED) {
+      throw new ConflictException(
+        safeError('ALREADY_BOOKED', 'La solicitud ya fue reservada'),
+      );
+    }
+
+    await this.assertPendingPublicTokenActive(record);
+
+    return {
+      requestId: request.id,
+      artistId: request.artistId,
+      status: 'pending',
+      durationMinutes: request.durationMinutes,
+      timezone,
+      expiresAt: record.expiresAt,
+      minDate: request.minDate?.toISOString().slice(0, 10) ?? null,
+      maxDate: request.maxDate?.toISOString().slice(0, 10) ?? null,
+      allowedWeekdays: this.jsonArray(request.allowedWeekdays),
+      allowedWindows: this.jsonWindows(request.allowedWindows),
+    };
+  }
+
+  private async findPublicToken(token: string): Promise<PublicTokenRecord> {
     try {
-      record = await this.prisma.bookingToken.findUnique({
+      const record = await this.prisma.bookingToken.findUnique({
         where: { tokenHash: hashBookingToken(token) },
         include: {
           request: {
@@ -428,60 +500,50 @@ export class BookingRequestsService {
           },
         },
       });
-    } catch {
+      if (!record) throw tokenNotFound();
+      return record;
+    } catch (error) {
+      this.rethrowHttp(error);
       throw serviceUnavailable();
     }
+  }
 
-    if (!record) throw tokenNotFound();
-
-    const request = record.request;
+  private assertPublicTokenNotRevoked(record: PublicTokenRecord): void {
     if (
       record.revokedAt !== null ||
-      request.status === BookingRequestStatus.CANCELLED ||
-      request.status === BookingRequestStatus.CLOSED
+      record.request.status === BookingRequestStatus.CANCELLED ||
+      record.request.status === BookingRequestStatus.CLOSED
     ) {
       throw tokenRevoked();
     }
+  }
 
-    const timezone = request.artist.studioSettings?.timezone;
+  private publicTimezone(record: PublicTokenRecord): string {
+    const timezone = record.request.artist.studioSettings?.timezone;
     if (!timezone) throw serviceUnavailable();
+    return timezone;
+  }
 
-    // A booked request remains safely readable even after its token has been
-    // consumed or its original TTL has elapsed. The request state is the
-    // source of truth for this already-reserved outcome.
-    if (request.status === BookingRequestStatus.BOOKED) {
-      return this.toPublicResponse(
-        request,
-        timezone,
-        record.expiresAt,
-        'booked',
-      );
-    }
-
+  private async assertPendingPublicTokenActive(
+    record: PublicTokenRecord,
+  ): Promise<void> {
     if (record.consumedAt !== null) {
       throw tokenRevoked();
     }
 
     const now = new Date();
     if (
-      request.status === BookingRequestStatus.EXPIRED ||
+      record.request.status === BookingRequestStatus.EXPIRED ||
       record.expiresAt.getTime() <= now.getTime()
     ) {
       if (
-        request.status === BookingRequestStatus.PENDING &&
+        record.request.status === BookingRequestStatus.PENDING &&
         record.expiresAt.getTime() <= now.getTime()
       ) {
-        await this.expirePublicRequestIfNeeded(request.id, now);
+        await this.expirePublicRequestIfNeeded(record.request.id, now);
       }
       throw tokenExpired();
     }
-
-    return this.toPublicResponse(
-      request,
-      timezone,
-      record.expiresAt,
-      'pending',
-    );
   }
 
   private toPublicResponse(
