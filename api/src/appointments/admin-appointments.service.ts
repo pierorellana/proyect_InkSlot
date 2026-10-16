@@ -324,8 +324,10 @@ export class AdminAppointmentsService {
     };
   }
 
-  private sanitizeChanges(value: Prisma.JsonValue | null): unknown {
-    if (value === null) return null;
+  private sanitizeChanges(
+    value: Prisma.JsonValue | null | undefined,
+  ): unknown {
+    if (value === null || value === undefined) return null;
     if (Array.isArray(value)) {
       return value.map((entry) => this.sanitizeChanges(entry));
     }
