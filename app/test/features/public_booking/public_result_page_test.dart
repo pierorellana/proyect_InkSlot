@@ -27,12 +27,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.appointmentCalls, 1);
-    expect(find.text('Tu espacio está apartado.'), findsOneWidget);
-    expect(find.text('En proceso'), findsOneWidget);
+    expect(find.textContaining('Nos vemos el martes'), findsOneWidget);
     expect(find.text('Ver mi reserva'), findsOneWidget);
-    expect(find.text('martes, 20 de octubre de 2026'), findsOneWidget);
+    expect(find.text('Guardar en mi calendario'), findsOneWidget);
+    expect(find.text('Mar 20 oct'), findsOneWidget);
+    expect(find.text('10:00 – 13:00'), findsOneWidget);
+    expect(find.textContaining('Estamos terminando de registrarlo'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Ver mi reserva'));
     await tester.tap(find.text('Ver mi reserva'));
     await tester.pumpAndSettle();
     expect(repository.appointmentCalls, 2);
@@ -58,11 +59,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('SIN CONEXIÓN'), findsOneWidget);
+    expect(find.text('Sin conexión'), findsOneWidget);
     repository.appointmentError = null;
     await tester.tap(find.text('Reintentar'));
     await tester.pumpAndSettle();
-    expect(find.text('Tu espacio está apartado.'), findsOneWidget);
+    expect(find.textContaining('Nos vemos el martes'), findsOneWidget);
   });
 
   testWidgets('renders a pending in-memory confirmation with reduced motion', (
@@ -87,12 +88,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.bySemanticsLabel('Reserva confirmada'), findsOneWidget);
-    expect(find.text('En proceso'), findsOneWidget);
+    expect(find.textContaining('Estamos terminando de registrarlo'), findsOneWidget);
   });
 }
 
-Widget _app(Widget child) =>
-    MaterialApp(theme: buildInkSlotTheme(), home: child);
+Widget _app(Widget child) => MediaQuery(
+  data: const MediaQueryData(disableAnimations: true),
+  child: MaterialApp(theme: buildInkSlotTheme(), home: child),
+);
 
 class _ResultRepository extends PublicReservationRepository {
   _ResultRepository({this.appointmentError}) : super(_NoopApiClient());

@@ -1,12 +1,21 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
-import '../../../core/widgets/inkslot_mono_label.dart';
+import '../../../core/widgets/inkslot_icon.dart';
+import '../../../core/widgets/inkslot_kit.dart';
+import '../../../core/widgets/inkslot_logo.dart';
+import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
+import '../domain/public_appointment.dart';
 import '../domain/public_reservation.dart';
 import 'public_reservation_controller.dart';
+import 'public_studio_link.dart';
 import 'widgets/flash_mosaic.dart';
-import 'widgets/public_state_panel.dart';
+import 'widgets/public_chrome.dart';
+import 'widgets/public_format.dart';
+import 'widgets/public_time_zone_formatter.dart';
 
 class PublicWelcomePage extends StatefulWidget {
   const PublicWelcomePage({
@@ -25,6 +34,9 @@ class PublicWelcomePage extends StatefulWidget {
 }
 
 class _PublicWelcomePageState extends State<PublicWelcomePage> {
+  bool _retrying = false;
+  bool _appointmentRequested = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,7 +46,10 @@ class _PublicWelcomePageState extends State<PublicWelcomePage> {
   @override
   void didUpdateWidget(covariant PublicWelcomePage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.token != widget.token) _loadReservation();
+    if (oldWidget.token != widget.token) {
+      _appointmentRequested = false;
+      _loadReservation();
+    }
   }
 
   void _loadReservation() {
@@ -43,162 +58,270 @@ class _PublicWelcomePageState extends State<PublicWelcomePage> {
     });
   }
 
+  void _retry() {
+    setState(() => _retrying = true);
+    widget.controller.retryReservation();
+  }
+
+  void _loadBookedAppointment() {
+    if (_appointmentRequested) return;
+    _appointmentRequested = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.controller.appointment == null) {
+        widget.controller.loadAppointment(widget.token);
+      }
+    });
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: InkSlotColors.deep,
-    body: SafeArea(
-      bottom: true,
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: const EdgeInsets.only(bottom: 34),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: constraints.maxWidth >= 720 ? 560 : 560,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const FlashMosaic(),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: AnimatedBuilder(
-                      animation: widget.controller,
-                      builder: (context, _) => _WelcomeContent(
-                        controller: widget.controller,
+  Widget build(BuildContext context) => PublicScreen(
+    builder: (context, safe) => AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        final controller = widget.controller;
+        final status = controller.reservationStatus;
+        if (status != PublicReservationStatus.loading) _retrying = false;
+        final offline =
+            status == PublicReservationStatus.error ||
+            (status == PublicReservationStatus.loading && _retrying);
+        if (status == PublicReservationStatus.booked) _loadBookedAppointment();
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            if (!offline)
+              const Positioned(top: 0, left: 0, right: 0, child: FlashMosaic()),
+            Positioned(
+              top: safe.top,
+              left: 20,
+              right: 20,
+              child: const _WelcomeHeader(),
+            ),
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  reverse: true,
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    safe.top + 60,
+                    24,
+                    40 + (safe.bottom - InkSlotSpacing.safeAreaBottomReference),
+                  ),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight - safe.top - 60 - 40,
+                    ),
+                    child: Align(
+                      alignment: Alignment.bottomCenter,
+                      child: _WelcomeBody(
+                        controller: controller,
+                        offline: offline,
+                        retrying: _retrying,
+                        onRetry: _retry,
                         onChooseDate: widget.onChooseDate,
                       ),
                     ),
                   ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
-      ),
+          ],
+        );
+      },
     ),
   );
 }
 
-class _WelcomeContent extends StatelessWidget {
-  const _WelcomeContent({required this.controller, required this.onChooseDate});
+class _WelcomeHeader extends StatelessWidget {
+  const _WelcomeHeader();
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: const BoxDecoration(
+              color: InkSlotColors.bone,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const InkSlotLogo(
+              size: 18,
+              color: InkSlotColors.ink,
+              semanticsLabel: 'Dodogio',
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'DODOGIO',
+            style: inkSlotMono(
+              size: 12,
+              color: InkSlotColors.bone,
+              spacing: .32,
+            ),
+          ),
+        ],
+      ),
+      ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            height: 32,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xB30A0A0B),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0x1FEEE9E0)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const InkSlotIcon(
+                  InkSlotIcons.candado,
+                  size: 12,
+                  color: Color(0xFFCFC9BF),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'ENLACE PRIVADO',
+                  style: inkSlotMono(size: 10, color: const Color(0xFFCFC9BF)),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _WelcomeBody extends StatelessWidget {
+  const _WelcomeBody({
+    required this.controller,
+    required this.offline,
+    required this.retrying,
+    required this.onRetry,
+    required this.onChooseDate,
+  });
 
   final PublicReservationController controller;
+  final bool offline;
+  final bool retrying;
+  final VoidCallback onRetry;
   final VoidCallback onChooseDate;
 
   @override
   Widget build(BuildContext context) {
     final reservation = controller.reservation;
     final status = controller.reservationStatus;
-    if (reservation == null ||
+    if (offline) return _OfflineBlock(retrying: retrying, onRetry: onRetry);
+    if (status == PublicReservationStatus.idle ||
         status == PublicReservationStatus.loading ||
-        status == PublicReservationStatus.idle) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 4),
-        child: PublicStatePanel(
-          kind: PublicStateKind.loading,
-          title: 'Cargando tu reserva',
-          message: 'Estamos preparando los detalles de tu enlace privado.',
+        (reservation == null && status == PublicReservationStatus.active)) {
+      return const InkSlotRise(
+        child: PublicTag(
+          'Cargando tu reserva',
+          color: InkSlotColors.copper,
+          live: true,
         ),
       );
     }
-
     if (status != PublicReservationStatus.active) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 4),
-        child: PublicStatePanel(
-          kind: _stateKind(status),
-          title: _stateTitle(status),
-          message: controller.reservationError ?? _stateMessage(status),
-          onRetry: status == PublicReservationStatus.error
-              ? controller.retryReservation
-              : null,
-        ),
+      final booked = controller.appointment;
+      return PublicBlockedMessage(
+        status: status,
+        middle: status == PublicReservationStatus.booked && booked != null
+            ? _BookedTicket(appointment: booked)
+            : null,
       );
     }
+    return _ActiveBlock(reservation: reservation!, onChooseDate: onChooseDate);
+  }
+}
 
+class _ActiveBlock extends StatelessWidget {
+  const _ActiveBlock({required this.reservation, required this.onChooseDate});
+
+  final PublicReservation reservation;
+  final VoidCallback onChooseDate;
+
+  @override
+  Widget build(BuildContext context) {
+    final expiry = publicDateParts(reservation.expiresAt, reservation.timezone);
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
+        InkSlotRise(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PublicTag(
+                'Reserva abierta · ${publicExpiryLabel(reservation.expiresAt)}',
                 color: InkSlotColors.copper,
-                shape: BoxShape.circle,
+                live: true,
               ),
-            ),
-            const SizedBox(width: 10),
-            InkSlotMonoLabel(
-              'Reserva abierta · ${_expiryLabel(reservation.expiresAt)}',
-              color: InkSlotColors.copperLight,
-            ),
-          ],
-        ),
-        const SizedBox(height: 26),
-        Text.rich(
-          TextSpan(
-            text: '${reservation.artistDisplayName},\n',
-            children: const [
-              TextSpan(
-                text: 'tu espacio te espera.',
-                style: TextStyle(fontStyle: FontStyle.italic),
+              const SizedBox(height: 12),
+              Text.rich(
+                TextSpan(
+                  text: '${reservation.artistDisplayName},\n',
+                  children: [
+                    TextSpan(
+                      text: 'tu espacio te espera.',
+                      style: inkSlotSerif(
+                        44,
+                        italic: true,
+                        color: const Color(0xFFCFC9BF),
+                      ),
+                    ),
+                  ],
+                ),
+                style: inkSlotSerif(44),
               ),
             ],
           ),
-          style: const TextStyle(
-            color: InkSlotColors.cream,
-            fontFamily: 'Instrument Serif',
-            fontSize: 44,
-            height: 0.98,
+        ),
+        const SizedBox(height: 22),
+        InkSlotRise.step(2, child: _SummaryCard(reservation: reservation)),
+        const SizedBox(height: 22),
+        InkSlotRise.step(
+          3,
+          child: _ArtistRow(
+            name: '${reservation.artistDisplayName} · Dodogio Studio',
+            subtitle:
+                'Hasta el ${expiry.day} ${expiry.monthShort} · '
+                '${publicZoneDescription(reservation.timezone).split(' (').first}',
           ),
         ),
-        const SizedBox(height: 28),
-        _SummaryCard(reservation: reservation),
-        const SizedBox(height: 24),
-        _ArtistRow(reservation: reservation),
-        const SizedBox(height: 28),
-        InkSlotPrimaryButton(
-          label: 'Elegir fecha y hora',
-          onPressed: onChooseDate,
-          trailing: const Icon(Icons.arrow_forward, size: 22),
-        ),
-        const SizedBox(height: 12),
-        const TextButton(
-          onPressed: null,
-          child: Text('¿Dudas? Escríbele al estudio'),
+        const SizedBox(height: 22),
+        InkSlotRise.step(
+          4,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InkSlotPrimaryButton(
+                label: 'Elegir fecha y hora',
+                onPressed: onChooseDate,
+                trailing: const InkSlotIcon(
+                  InkSlotIcons.flechaDerecha,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(height: 8),
+              PublicTextLink(
+                '¿Dudas? Escríbele al estudio',
+                onTap: () => contactPublicStudio(context),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
-
-  PublicStateKind _stateKind(PublicReservationStatus status) =>
-      switch (status) {
-        PublicReservationStatus.expired => PublicStateKind.expired,
-        PublicReservationStatus.revoked => PublicStateKind.revoked,
-        PublicReservationStatus.booked => PublicStateKind.booked,
-        _ => PublicStateKind.error,
-      };
-
-  String _stateTitle(PublicReservationStatus status) => switch (status) {
-    PublicReservationStatus.expired => 'Este enlace expiró',
-    PublicReservationStatus.revoked => 'Este enlace ya no está disponible',
-    PublicReservationStatus.booked => 'Esta reserva ya está agendada',
-    _ => 'No pudimos cargar la reserva',
-  };
-
-  String _stateMessage(PublicReservationStatus status) => switch (status) {
-    PublicReservationStatus.expired =>
-      'Solicita un nuevo enlace al estudio para continuar.',
-    PublicReservationStatus.revoked =>
-      'Solicita al estudio que revise el estado de tu reserva.',
-    PublicReservationStatus.booked =>
-      'El horario de esta solicitud ya fue confirmado.',
-    _ => 'Intenta nuevamente en unos momentos.',
-  };
 }
 
 class _SummaryCard extends StatelessWidget {
@@ -207,34 +330,51 @@ class _SummaryCard extends StatelessWidget {
   final PublicReservation reservation;
 
   @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.line),
-    ),
+  Widget build(BuildContext context) => InkSlotCard(
     child: IntrinsicHeight(
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: _SummaryItem(
               label: 'Sesión',
-              value: _durationLabel(reservation.durationMinutes),
+              value: Text(
+                publicDurationLabel(reservation.durationMinutes),
+                style: _valueStyle,
+              ),
             ),
           ),
-          const VerticalDivider(width: 1, color: InkSlotColors.line),
+          const _SummaryDivider(),
           const Expanded(
             child: _SummaryItem(
               label: 'Anticipo',
-              value: 'Validado ✓',
-              valueColor: InkSlotColors.successText,
+              value: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  children: [
+                    Text('Validado', style: _valueStyle),
+                    SizedBox(width: 6),
+                    InkSlotIcon(
+                      InkSlotIcons.check,
+                      size: 15,
+                      color: InkSlotColors.success,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const VerticalDivider(width: 1, color: InkSlotColors.line),
+          const _SummaryDivider(),
           Expanded(
             child: _SummaryItem(
               label: 'Días',
-              value: _restrictionDays(reservation.restrictions.allowedWeekdays),
+              value: Text(
+                _restrictionDays(reservation.restrictions.allowedWeekdays),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: _valueStyle,
+              ),
             ),
           ),
         ],
@@ -243,87 +383,85 @@ class _SummaryCard extends StatelessWidget {
   );
 }
 
+const _valueStyle = TextStyle(
+  color: InkSlotColors.bone,
+  fontSize: 17,
+  fontWeight: FontWeight.w500,
+);
+
+class _SummaryDivider extends StatelessWidget {
+  const _SummaryDivider();
+
+  @override
+  Widget build(BuildContext context) =>
+      const VerticalDivider(width: 1, thickness: 1, color: InkSlotColors.line);
+}
+
 class _SummaryItem extends StatelessWidget {
-  const _SummaryItem({
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
+  const _SummaryItem({required this.label, required this.value});
 
   final String label;
-  final String value;
-  final Color? valueColor;
+  final Widget value;
 
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(14, 16, 12, 18),
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkSlotMonoLabel(label),
-        const SizedBox(height: 9),
         Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: valueColor ?? InkSlotColors.cream,
-            fontSize: 17,
-            fontWeight: FontWeight.w500,
-          ),
+          label.toUpperCase(),
+          style: inkSlotMono(size: 9, color: InkSlotColors.tertiary),
         ),
+        const SizedBox(height: 6),
+        value,
       ],
     ),
   );
 }
 
 class _ArtistRow extends StatelessWidget {
-  const _ArtistRow({required this.reservation});
+  const _ArtistRow({required this.name, required this.subtitle});
 
-  final PublicReservation reservation;
+  final String name;
+  final String subtitle;
 
   @override
   Widget build(BuildContext context) => Row(
     children: [
       Container(
-        width: 54,
-        height: 54,
+        width: 44,
+        height: 44,
         decoration: const BoxDecoration(
           color: InkSlotColors.tobacco,
           shape: BoxShape.circle,
         ),
         alignment: Alignment.center,
-        child: Text(
-          _initial(reservation.artistDisplayName),
-          style: const TextStyle(
-            color: InkSlotColors.bone,
-            fontFamily: 'Instrument Serif',
-            fontSize: 32,
-          ),
+        child: const InkSlotLogo(
+          size: 20,
+          color: InkSlotColors.bone,
+          semanticsLabel: 'Dodogio',
         ),
       ),
-      const SizedBox(width: 14),
+      const SizedBox(width: 12),
       Expanded(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              reservation.artistDisplayName,
+              name,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                color: InkSlotColors.cream,
-                fontSize: 16,
+                color: InkSlotColors.bone,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 5),
+            const SizedBox(height: 2),
             Text(
-              'Hasta ${_expiryLabel(reservation.expiresAt)} · ${reservation.timezone}',
+              subtitle,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: InkSlotColors.secondary,
-                fontSize: 14,
-              ),
+              style: const TextStyle(color: InkSlotColors.ash, fontSize: 13),
             ),
           ],
         ),
@@ -332,24 +470,137 @@ class _ArtistRow extends StatelessWidget {
   );
 }
 
-String _durationLabel(int minutes) {
-  final hours = minutes ~/ 60;
-  final remainder = minutes % 60;
-  if (remainder == 0) return hours == 1 ? '1 hora' : '$hours horas';
-  return '${hours}h ${remainder}m';
+class _OfflineBlock extends StatelessWidget {
+  const _OfflineBlock({required this.retrying, required this.onRetry});
+
+  final bool retrying;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      InkSlotRise(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: InkSlotColors.sheet,
+              shape: BoxShape.circle,
+              border: Border.all(color: const Color(0x1AEEE9E0)),
+            ),
+            alignment: Alignment.center,
+            child: const InkSlotIcon(InkSlotIcons.sinConexion, size: 26),
+          ),
+        ),
+      ),
+      const SizedBox(height: 20),
+      InkSlotRise.step(
+        1,
+        child: const PublicHeadline(
+          title: 'Sin conexión.',
+          body:
+              'No pudimos cargar tu reserva. Tu solicitud y tu anticipo siguen guardados; vuelve a intentarlo cuando tengas señal.',
+        ),
+      ),
+      const SizedBox(height: 20),
+      InkSlotRise.step(
+        2,
+        child: Opacity(
+          opacity: retrying ? .28 : 1,
+          child: InkSlotPrimaryButton(
+            label: retrying ? 'Conectando…' : 'Reintentar',
+            loading: retrying,
+            onPressed: retrying ? null : onRetry,
+          ),
+        ),
+      ),
+    ],
+  );
+}
+
+class _BookedTicket extends StatelessWidget {
+  const _BookedTicket({required this.appointment});
+
+  final PublicAppointment appointment;
+
+  @override
+  Widget build(BuildContext context) {
+    final parts = publicDateParts(appointment.startAt, appointment.timezone);
+    final range =
+        '${formatPublicTime(appointment.startAt, appointment.timezone)}–'
+        '${formatPublicTime(appointment.endAt, appointment.timezone)}';
+    final minutes = appointment.endAt.difference(appointment.startAt).inMinutes;
+    return InkSlotCard(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 64,
+            decoration: BoxDecoration(
+              color: InkSlotColors.bone,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  parts.monthShort.toUpperCase(),
+                  style: inkSlotMono(size: 9, color: InkSlotColors.ink),
+                ),
+                Text(
+                  '${parts.day}',
+                  style: inkSlotSerif(30, color: InkSlotColors.ink),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${publicCapitalize(parts.weekdayShort)} · $range',
+                  style: const TextStyle(
+                    color: InkSlotColors.bone,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Sesión de ${publicDurationShort(minutes)} · Dodogio Studio',
+                  style: const TextStyle(
+                    color: InkSlotColors.ash,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _restrictionDays(List<int>? weekdays) {
   if (weekdays == null || weekdays.isEmpty) return 'Flexible';
   const labels = <String>['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
-  final selected = weekdays.toList()..sort();
+  final selected = weekdays.toSet().toList()..sort();
   if (selected.length == 7) return 'Todos';
-  return selected.map((day) => labels[day]).join(' – ');
+  final consecutive =
+      selected.length > 2 &&
+      [
+        for (var i = 1; i < selected.length; i++) selected[i] - selected[i - 1],
+      ].every((gap) => gap == 1);
+  if (consecutive) {
+    return '${labels[selected.first]} – ${labels[selected.last]}';
+  }
+  return selected.map((day) => labels[day]).join(' · ');
 }
-
-String _expiryLabel(DateTime value) =>
-    '${value.day.toString().padLeft(2, '0')}/'
-    '${value.month.toString().padLeft(2, '0')}';
-
-String _initial(String value) =>
-    value.trim().isEmpty ? '·' : value.trim()[0].toUpperCase();

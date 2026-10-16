@@ -1,13 +1,19 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
+import '../../../core/widgets/inkslot_icon.dart';
+import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_logo.dart';
-import '../../../core/widgets/inkslot_mono_label.dart';
+import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../domain/public_availability.dart';
 import '../domain/public_reservation.dart';
 import 'public_reservation_controller.dart';
-import 'widgets/public_state_panel.dart';
+import 'widgets/public_chrome.dart';
+import 'widgets/public_format.dart';
 import 'widgets/public_time_zone_formatter.dart';
 
 class PublicReviewPage extends StatefulWidget {
@@ -51,27 +57,21 @@ class _PublicReviewPageState extends State<PublicReviewPage> {
     });
   }
 
+  Future<void> _confirm() async {
+    final confirmation = await widget.controller.confirmSelected(widget.token);
+    if (confirmation != null && mounted) widget.onConfirmed();
+  }
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: InkSlotColors.deep,
-    body: SafeArea(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 34),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: AnimatedBuilder(
-              animation: widget.controller,
-              builder: (context, _) => _ReviewContent(
-                controller: widget.controller,
-                token: widget.token,
-                onBack: widget.onBack,
-                onConfirmed: widget.onConfirmed,
-              ),
-            ),
-          ),
-        ),
+  Widget build(BuildContext context) => PublicScreen(
+    builder: (context, safe) => AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) => _ReviewContent(
+        safe: safe,
+        controller: widget.controller,
+        token: widget.token,
+        onBack: widget.onBack,
+        onConfirm: _confirm,
       ),
     ),
   );
@@ -79,253 +79,481 @@ class _PublicReviewPageState extends State<PublicReviewPage> {
 
 class _ReviewContent extends StatelessWidget {
   const _ReviewContent({
+    required this.safe,
     required this.controller,
     required this.token,
     required this.onBack,
-    required this.onConfirmed,
+    required this.onConfirm,
   });
 
+  final EdgeInsets safe;
   final PublicReservationController controller;
   final String token;
   final VoidCallback onBack;
-  final VoidCallback onConfirmed;
+  final VoidCallback onConfirm;
 
   @override
   Widget build(BuildContext context) {
     final reservation = controller.reservation;
     final reservationStatus = controller.reservationStatus;
+    final confirmationStatus = controller.confirmationStatus;
+    final slot = controller.selectedSlot;
+
+    Widget framed(Widget child) => Padding(
+      padding: EdgeInsets.fromLTRB(20, safe.top, 20, safe.bottom),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PublicStepHeader(
+            step: 3,
+            onBack: onBack,
+            backLabel: 'Cambiar horario',
+          ),
+          Expanded(child: PublicBottomAligned(child: child)),
+        ],
+      ),
+    );
+
     if (controller.token != token ||
         reservation == null ||
         reservationStatus == PublicReservationStatus.idle ||
         reservationStatus == PublicReservationStatus.loading) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 90),
-        child: PublicStatePanel(
-          kind: PublicStateKind.loading,
-          title: 'Cargando tu reserva',
-          message: 'Estamos preparando tu ticket de revisión.',
+      return framed(
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: PublicTag(
+            'Cargando tu reserva',
+            color: InkSlotColors.copper,
+            live: true,
+          ),
         ),
       );
     }
     if (reservationStatus != PublicReservationStatus.active) {
-      return _state(
-        kind: _reservationKind(reservationStatus),
-        title: _reservationTitle(reservationStatus),
-        message:
-            controller.reservationError ??
-            _reservationMessage(reservationStatus),
-        onRetry: reservationStatus == PublicReservationStatus.error
-            ? controller.retryReservation
-            : null,
-        onBack: onBack,
+      return framed(
+        PublicBlockedMessage(
+          status: reservationStatus == PublicReservationStatus.error
+              ? PublicReservationStatus.expired
+              : reservationStatus,
+        ),
       );
     }
-
-    final slot = controller.selectedSlot;
+    final blockedByConfirmation = switch (confirmationStatus) {
+      PublicConfirmationStatus.alreadyBooked => PublicReservationStatus.booked,
+      PublicConfirmationStatus.expired => PublicReservationStatus.expired,
+      PublicConfirmationStatus.revoked => PublicReservationStatus.revoked,
+      _ => null,
+    };
+    if (blockedByConfirmation != null) {
+      return framed(PublicBlockedMessage(status: blockedByConfirmation));
+    }
     if (slot == null) {
-      return _state(
-        kind: PublicStateKind.empty,
-        title: 'Elige un horario primero',
-        message:
-            'Vuelve a fechas para seleccionar el espacio que quieres reservar.',
-        onBack: onBack,
+      return framed(
+        PublicStateBlock(
+          icon: InkSlotIcons.calendarioVacio,
+          title: 'Elige un horario primero',
+          message:
+              'Vuelve a fechas para seleccionar el espacio que quieres reservar.',
+          secondaryLabel: 'Volver',
+          onSecondary: onBack,
+        ),
       );
     }
 
-    final confirmationStatus = controller.confirmationStatus;
-    final showError =
-        confirmationStatus != PublicConfirmationStatus.idle &&
-        confirmationStatus != PublicConfirmationStatus.loading &&
-        confirmationStatus != PublicConfirmationStatus.confirmed;
-    final canConfirm = _canConfirm(confirmationStatus);
+    final loading = confirmationStatus == PublicConfirmationStatus.loading;
+    final conflict = confirmationStatus == PublicConfirmationStatus.conflict;
+    final inlineError = switch (confirmationStatus) {
+      PublicConfirmationStatus.calendarUnavailable => (
+        InkSlotIcons.calendarioAlerta,
+        PublicStateTone.warning,
+        'No pudimos verificar la agenda',
+        'Para no confirmarte una hora que quizás ya esté ocupada, esperamos a verificarla con el estudio.',
+      ),
+      PublicConfirmationStatus.offline => (
+        InkSlotIcons.sinConexion,
+        PublicStateTone.neutral,
+        'Sin conexión',
+        'Revisa tu conexión e intenta nuevamente.',
+      ),
+      PublicConfirmationStatus.error => (
+        InkSlotIcons.alerta,
+        PublicStateTone.warning,
+        'No pudimos confirmar la reserva',
+        controller.confirmationError ?? 'Intenta nuevamente en unos momentos.',
+      ),
+      _ => null,
+    };
+    final canConfirm =
+        confirmationStatus == PublicConfirmationStatus.idle ||
+        inlineError != null;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        _ReviewHeader(onBack: onBack),
-        const SizedBox(height: 28),
-        const Text(
-          'Revisa tu espacio',
-          style: TextStyle(
-            color: InkSlotColors.cream,
-            fontFamily: 'Instrument Serif',
-            fontSize: 44,
-            height: 1,
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text(
-          'Confirma que todo esté correcto antes de cerrar tu reserva.',
-          style: TextStyle(
-            color: InkSlotColors.secondary,
-            fontSize: 15,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: 26),
-        _ReviewTicket(reservation: reservation, slot: slot),
-        if (showError) ...[
-          const SizedBox(height: 18),
-          PublicStatePanel(
-            kind: _confirmationKind(confirmationStatus),
-            title: _confirmationTitle(confirmationStatus),
-            message:
-                controller.confirmationError ??
-                _confirmationMessage(confirmationStatus),
-            onRetry: _canRetry(confirmationStatus)
-                ? controller.retryConfirmation
-                : null,
-            onBack: onBack,
-          ),
-        ],
-        const SizedBox(height: 20),
-        InkSlotPrimaryButton(
-          label: confirmationStatus == PublicConfirmationStatus.loading
-              ? 'Confirmando…'
-              : 'Confirmar reserva',
-          onPressed: canConfirm
-              ? () async {
-                  final confirmation = await controller.confirmSelected(token);
-                  if (confirmation != null) onConfirmed();
-                }
-              : null,
-          trailing: confirmationStatus == PublicConfirmationStatus.loading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: InkSlotColors.ink,
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, safe.top, 20, safe.bottom),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              PublicStepHeader(
+                step: 3,
+                onBack: loading ? null : onBack,
+                backLabel: 'Cambiar horario',
+              ),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 28),
+                      const InkSlotRise(
+                        child: PublicHeading('Revisa y confirma'),
+                      ),
+                      const SizedBox(height: 22),
+                      _ReviewTicket(reservation: reservation, slot: slot),
+                      if (inlineError != null) ...[
+                        const SizedBox(height: 22),
+                        PublicStateBlock(
+                          icon: inlineError.$1,
+                          tone: inlineError.$2,
+                          title: inlineError.$3,
+                          message: inlineError.$4,
+                        ),
+                      ] else
+                        const Padding(
+                          padding: EdgeInsets.fromLTRB(4, 18, 4, 0),
+                          child: Text(
+                            'Al confirmar, este horario queda reservado a tu nombre y se registra en la agenda del estudio.',
+                            style: TextStyle(
+                              color: InkSlotColors.ash,
+                              fontSize: 14,
+                              height: 1.5,
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
                   ),
-                )
-              : const Icon(Icons.check_rounded, size: 22),
+                ),
+              ),
+              Opacity(
+                opacity: loading ? .28 : 1,
+                child: InkSlotPrimaryButton(
+                  label: loading
+                      ? 'Reservando tu horario…'
+                      : inlineError != null
+                      ? 'Reintentar'
+                      : 'Confirmar cita',
+                  loading: loading,
+                  onPressed: canConfirm || loading ? onConfirm : null,
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        TextButton(
-          onPressed: onBack,
-          child: const Text('Cambiar fecha u hora'),
+        if (conflict)
+          _ConflictSheet(
+            start: formatPublicTime(slot.startAt, reservation.timezone),
+            onResolve: onBack,
+          ),
+      ],
+    );
+  }
+}
+
+/// Hoja `.sheet` + `.ovl` del 409: «Ese horario se acaba de ocupar».
+class _ConflictSheet extends StatelessWidget {
+  const _ConflictSheet({required this.start, required this.onResolve});
+
+  final String start;
+  final VoidCallback onResolve;
+
+  @override
+  Widget build(BuildContext context) {
+    final reduce = inkSlotReduceMotion(context);
+    final duration = reduce ? Duration.zero : InkSlotMotion.sheet;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1),
+          duration: reduce ? Duration.zero : const Duration(milliseconds: 300),
+          builder: (context, t, child) => Opacity(opacity: t, child: child),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+            child: const ColoredBox(color: Color(0x99000000)),
+          ),
+        ),
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: publicMaxWidth),
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 1.1, end: 0),
+              duration: duration,
+              curve: InkSlotMotion.sheetCurve,
+              builder: (context, t, child) => FractionalTranslation(
+                translation: Offset(0, t),
+                child: child,
+              ),
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  8,
+                  0,
+                  8,
+                  8 + MediaQuery.paddingOf(context).bottom * .5,
+                ),
+                child: Semantics(
+                  container: true,
+                  label: 'Horario ocupado',
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(24, 28, 24, 26),
+                    decoration: BoxDecoration(
+                      color: InkSlotColors.sheet,
+                      borderRadius: BorderRadius.circular(InkSlotRadii.sheet),
+                      border: Border.all(color: InkSlotColors.line),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: const BoxDecoration(
+                            color: Color(0x24C87939),
+                            shape: BoxShape.circle,
+                          ),
+                          alignment: Alignment.center,
+                          child: const InkSlotIcon(
+                            InkSlotIcons.reloj,
+                            size: 24,
+                            color: InkSlotColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          'Ese horario se acaba de ocupar',
+                          style: inkSlotSerif(32, height: 1.02),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'Otra persona confirmó las $start hace un instante. No se hizo ningún cobro ni reserva; elige otra hora.',
+                          style: const TextStyle(
+                            color: InkSlotColors.secondary,
+                            fontSize: 15,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        InkSlotPrimaryButton(
+                          label: 'Ver horarios actualizados',
+                          onPressed: onResolve,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
         ),
       ],
     );
   }
-
-  Widget _state({
-    required PublicStateKind kind,
-    required String title,
-    required String message,
-    VoidCallback? onRetry,
-    VoidCallback? onBack,
-  }) => Padding(
-    padding: const EdgeInsets.only(top: 90),
-    child: PublicStatePanel(
-      kind: kind,
-      title: title,
-      message: message,
-      onRetry: onRetry,
-      onBack: onBack,
-    ),
-  );
 }
 
-class _ReviewHeader extends StatelessWidget {
-  const _ReviewHeader({required this.onBack});
-
-  final VoidCallback onBack;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    children: [
-      IconButton(
-        onPressed: onBack,
-        icon: const Icon(Icons.arrow_back),
-        tooltip: 'Volver a fechas',
-        constraints: const BoxConstraints(
-          minWidth: InkSlotSpacing.minimumTapTarget,
-          minHeight: InkSlotSpacing.minimumTapTarget,
-        ),
-      ),
-      const Spacer(),
-      const InkSlotMonoLabel('Paso 2 de 3', color: InkSlotColors.copperLight),
-    ],
-  );
-}
-
-class _ReviewTicket extends StatelessWidget {
+/// `.tk`: ticket 3D con entrada `tkIn`, inclinación que sigue al puntero y
+/// brillo `.tk-sheen`.
+class _ReviewTicket extends StatefulWidget {
   const _ReviewTicket({required this.reservation, required this.slot});
 
   final PublicReservation reservation;
   final AvailabilitySlot slot;
 
   @override
+  State<_ReviewTicket> createState() => _ReviewTicketState();
+}
+
+class _ReviewTicketState extends State<_ReviewTicket>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entry = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 1),
+  );
+  late final Animation<double> _in = CurvedAnimation(
+    parent: _entry,
+    curve: InkSlotMotion.threeDimension,
+  );
+  Offset _tilt = Offset.zero;
+  bool _started = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    if (inkSlotReduceMotion(context)) {
+      _entry.value = 1;
+    } else {
+      _entry.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _entry.dispose();
+    super.dispose();
+  }
+
+  void _track(PointerEvent event) {
+    if (inkSlotReduceMotion(context)) return;
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final local = box.globalToLocal(event.position);
+    final px = (local.dx / box.size.width - .5).clamp(-.5, .5);
+    final py = (local.dy / box.size.height - .5).clamp(-.5, .5);
+    setState(() => _tilt = Offset(-py * 8, px * 10));
+  }
+
+  void _reset() => setState(() => _tilt = Offset.zero);
+
+  @override
   Widget build(BuildContext context) {
-    final reduceMotion = MediaQuery.disableAnimationsOf(context);
-    final angle = reduceMotion ? 0.0 : -0.025;
+    final reservation = widget.reservation;
+    final slot = widget.slot;
+    final timezone = reservation.timezone;
+    final date = publicDateParts(slot.startAt, timezone);
+    final zone = publicZoneDescription(timezone).replaceFirst('hora de ', '');
     return Semantics(
       container: true,
       label: 'Ticket de revisión para ${reservation.artistDisplayName}',
-      child: Transform(
-        alignment: Alignment.center,
-        transform: Matrix4.identity()
-          ..setEntry(3, 2, 0.001)
-          ..rotateY(angle),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
-          decoration: BoxDecoration(
-            color: InkSlotColors.surface,
-            borderRadius: BorderRadius.circular(InkSlotRadii.card),
-            border: Border.all(color: InkSlotColors.copperGlow),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x33000000),
-                blurRadius: 24,
-                offset: Offset(0, 14),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  const InkSlotLogo(size: 42, color: InkSlotColors.copperLight),
-                  const Spacer(),
-                  const InkSlotMonoLabel(
-                    'InkSlot · ticket',
-                    color: InkSlotColors.copperLight,
+      child: Listener(
+        onPointerHover: _track,
+        onPointerMove: _track,
+        onPointerUp: (_) => _reset(),
+        onPointerCancel: (_) => _reset(),
+        child: MouseRegion(
+          onExit: (_) => _reset(),
+          child: AnimatedBuilder(
+            animation: _in,
+            builder: (context, child) {
+              final t = _in.value;
+              return Opacity(
+                opacity: t.clamp(0.0, 1.0),
+                child: TweenAnimationBuilder<Offset>(
+                  tween: Tween(begin: _tilt, end: _tilt),
+                  duration: const Duration(milliseconds: 250),
+                  curve: Curves.easeOut,
+                  builder: (context, tilt, _) => Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, -1 / 1100)
+                      ..rotateX(tilt.dx * math.pi / 180)
+                      ..rotateY(tilt.dy * math.pi / 180)
+                      ..rotateX(38 * (1 - t) * math.pi / 180)
+                      ..translateByDouble(0, 40 * (1 - t), 0, 1),
+                    child: _TicketFace(sheen: 50 + tilt.dy * 6, child: child!),
                   ),
-                ],
-              ),
-              const SizedBox(height: 24),
-              Text(
-                reservation.artistDisplayName,
-                style: const TextStyle(
-                  color: InkSlotColors.cream,
-                  fontFamily: 'Instrument Serif',
-                  fontSize: 34,
                 ),
-              ),
-              const SizedBox(height: 18),
-              const Divider(color: InkSlotColors.line),
-              const SizedBox(height: 18),
-              _TicketRow(
-                label: 'Fecha',
-                value: formatPublicDate(slot.startAt, reservation.timezone),
-              ),
-              const SizedBox(height: 14),
-              _TicketRow(
-                label: 'Hora',
-                value:
-                    '${formatPublicTime(slot.startAt, reservation.timezone)} — '
-                    '${formatPublicTime(slot.endAt, reservation.timezone)}',
-              ),
-              const SizedBox(height: 14),
-              _TicketRow(
-                label: 'Duración',
-                value: _durationLabel(reservation.durationMinutes),
-              ),
-              const SizedBox(height: 14),
-              _TicketRow(label: 'Zona', value: reservation.timezone),
-            ],
+              );
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 22, 22, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'DODOGIO STUDIO',
+                            style: inkSlotMono(
+                              size: 10,
+                              color: InkSlotColors.ash,
+                              spacing: .3,
+                            ),
+                          ),
+                          const InkSlotLogo(
+                            size: 18,
+                            semanticsLabel: 'Dodogio',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        '${publicCapitalize(date.weekdayShort)} ${date.day}',
+                        style: inkSlotSerif(52, height: .95),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${date.monthLong} ${date.year}',
+                        style: inkSlotSerif(
+                          24,
+                          italic: true,
+                          color: InkSlotColors.secondary,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          _TicketTime(formatPublicTime(slot.startAt, timezone)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              height: 1,
+                              color: const Color(0x40EEE9E0),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _TicketTime(formatPublicTime(slot.endAt, timezone)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const _Perforation(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+                  child: Column(
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _TicketField(
+                              'Duración',
+                              publicDurationLabel(reservation.durationMinutes),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(child: _TicketField('Zona', zone)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: _TicketField(
+                              'Artista',
+                              reservation.artistDisplayName,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: _TicketField('Estudio', 'Dodogio Studio'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -333,109 +561,159 @@ class _ReviewTicket extends StatelessWidget {
   }
 }
 
-class _TicketRow extends StatelessWidget {
-  const _TicketRow({required this.label, required this.value});
+class _TicketFace extends StatelessWidget {
+  const _TicketFace({required this.sheen, required this.child});
+
+  final double sheen;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(
+      color: const Color(0xFF151517),
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: const Color(0x17EEE9E0)),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Stack(
+      children: [
+        child,
+        Positioned.fill(
+          child: IgnorePointer(
+            child: CustomPaint(painter: _SheenPainter(sheen)),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// `linear-gradient(115deg, transparent 30%, bone .07 48%, transparent 62%)`
+/// con `background-size: 220% 100%` desplazado según `background-position`.
+class _SheenPainter extends CustomPainter {
+  _SheenPainter(this.position);
+
+  final double position;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final width = size.width * 2.2;
+    final dx = (size.width - width) * position / 100;
+    final box = Rect.fromLTWH(dx, 0, width, size.height);
+    const angle = 115 * math.pi / 180;
+    final direction = Offset(math.sin(angle), -math.cos(angle));
+    final length =
+        (box.width * math.sin(angle)).abs() +
+        (box.height * math.cos(angle)).abs();
+    final center = box.center;
+    final shader = ui.Gradient.linear(
+      center - direction * (length / 2),
+      center + direction * (length / 2),
+      const [Color(0x00EEE9E0), Color(0x12EEE9E0), Color(0x00EEE9E0)],
+      const [.30, .48, .62],
+    );
+    canvas.save();
+    canvas.clipRect(Offset.zero & size);
+    canvas.drawRect(box, Paint()..shader = shader);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_SheenPainter old) => old.position != position;
+}
+
+class _TicketTime extends StatelessWidget {
+  const _TicketTime(this.value);
+
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Text(
+    value,
+    style: const TextStyle(
+      fontFamily: 'Geist Mono',
+      fontSize: 22,
+      color: InkSlotColors.bone,
+    ),
+  );
+}
+
+class _TicketField extends StatelessWidget {
+  const _TicketField(this.label, this.value);
 
   final String label;
   final String value;
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      SizedBox(width: 86, child: InkSlotMonoLabel(label)),
-      Expanded(
-        child: Text(
-          value,
-          style: const TextStyle(
-            color: InkSlotColors.cream,
-            fontSize: 15,
-            height: 1.35,
-          ),
-        ),
+      Text(
+        label.toUpperCase(),
+        style: inkSlotMono(size: 9, color: InkSlotColors.tertiary),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        value,
+        style: const TextStyle(color: InkSlotColors.bone, fontSize: 15),
       ),
     ],
   );
 }
 
-PublicStateKind _reservationKind(PublicReservationStatus status) =>
-    switch (status) {
-      PublicReservationStatus.expired => PublicStateKind.expired,
-      PublicReservationStatus.revoked => PublicStateKind.revoked,
-      PublicReservationStatus.booked => PublicStateKind.booked,
-      _ => PublicStateKind.error,
-    };
+/// `.perf`: línea punteada con muescas circulares en ambos bordes.
+class _Perforation extends StatelessWidget {
+  const _Perforation();
 
-String _reservationTitle(PublicReservationStatus status) => switch (status) {
-  PublicReservationStatus.expired => 'Este enlace expiró',
-  PublicReservationStatus.revoked => 'Este enlace ya no está disponible',
-  PublicReservationStatus.booked => 'Esta reserva ya está agendada',
-  _ => 'No pudimos cargar la reserva',
-};
+  @override
+  Widget build(BuildContext context) => SizedBox(
+    height: 1,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        const Positioned(
+          left: 22,
+          right: 22,
+          top: 0,
+          height: 1,
+          child: CustomPaint(painter: _DashPainter()),
+        ),
+        for (final side in [true, false])
+          Positioned(
+            left: side ? -12 : null,
+            right: side ? null : -12,
+            top: -12,
+            child: Container(
+              width: 24,
+              height: 24,
+              decoration: const BoxDecoration(
+                color: InkSlotColors.ink,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
+}
 
-String _reservationMessage(PublicReservationStatus status) => switch (status) {
-  PublicReservationStatus.expired =>
-    'Solicita un nuevo enlace al estudio para continuar.',
-  PublicReservationStatus.revoked =>
-    'Solicita al estudio que revise tu reserva.',
-  PublicReservationStatus.booked =>
-    'El horario de esta solicitud ya fue confirmado.',
-  _ => 'Intenta nuevamente en unos momentos.',
-};
+class _DashPainter extends CustomPainter {
+  const _DashPainter();
 
-PublicStateKind _confirmationKind(PublicConfirmationStatus status) =>
-    switch (status) {
-      PublicConfirmationStatus.conflict => PublicStateKind.conflict,
-      PublicConfirmationStatus.alreadyBooked => PublicStateKind.alreadyBooked,
-      PublicConfirmationStatus.expired => PublicStateKind.expired,
-      PublicConfirmationStatus.revoked => PublicStateKind.revoked,
-      PublicConfirmationStatus.calendarUnavailable =>
-        PublicStateKind.calendarUnavailable,
-      PublicConfirmationStatus.offline => PublicStateKind.offline,
-      _ => PublicStateKind.error,
-    };
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0x2EEEE9E0)
+      ..strokeWidth = 1;
+    for (var x = 0.0; x < size.width; x += 7) {
+      canvas.drawLine(
+        Offset(x, .5),
+        Offset(math.min(x + 4, size.width), .5),
+        paint,
+      );
+    }
+  }
 
-String _confirmationTitle(PublicConfirmationStatus status) => switch (status) {
-  PublicConfirmationStatus.conflict => 'Ese horario cambió',
-  PublicConfirmationStatus.alreadyBooked => 'Esta reserva ya está agendada',
-  PublicConfirmationStatus.expired => 'Este enlace expiró',
-  PublicConfirmationStatus.revoked => 'Este enlace ya no está disponible',
-  PublicConfirmationStatus.calendarUnavailable => 'Agenda no verificable',
-  PublicConfirmationStatus.offline => 'Sin conexión',
-  _ => 'No pudimos confirmar la reserva',
-};
-
-String _confirmationMessage(
-  PublicConfirmationStatus status,
-) => switch (status) {
-  PublicConfirmationStatus.conflict =>
-    'El espacio dejó de estar disponible. Regresa a fechas para elegir otro.',
-  PublicConfirmationStatus.alreadyBooked =>
-    'Esta solicitud ya tiene un horario confirmado.',
-  PublicConfirmationStatus.expired => 'Solicita un nuevo enlace al estudio.',
-  PublicConfirmationStatus.revoked =>
-    'Solicita al estudio que revise tu reserva.',
-  PublicConfirmationStatus.calendarUnavailable =>
-    'No confirmaremos hasta poder verificar la agenda del estudio.',
-  PublicConfirmationStatus.offline =>
-    'Revisa tu conexión e intenta nuevamente.',
-  _ => 'Intenta nuevamente en unos momentos.',
-};
-
-bool _canRetry(PublicConfirmationStatus status) =>
-    status == PublicConfirmationStatus.calendarUnavailable ||
-    status == PublicConfirmationStatus.offline ||
-    status == PublicConfirmationStatus.error;
-
-bool _canConfirm(PublicConfirmationStatus status) =>
-    status == PublicConfirmationStatus.idle ||
-    status == PublicConfirmationStatus.calendarUnavailable ||
-    status == PublicConfirmationStatus.offline ||
-    status == PublicConfirmationStatus.error;
-
-String _durationLabel(int minutes) {
-  final hours = minutes ~/ 60;
-  final remainder = minutes % 60;
-  if (remainder == 0) return hours == 1 ? '1 hora' : '$hours horas';
-  return '${hours}h ${remainder}m';
+  @override
+  bool shouldRepaint(_DashPainter old) => false;
 }

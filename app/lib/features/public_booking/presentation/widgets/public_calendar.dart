@@ -1,242 +1,202 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/theme/inkslot_tokens.dart';
+import '../../../../core/widgets/inkslot_kit.dart';
+import '../../../../core/widgets/inkslot_motion.dart';
 import '../../domain/public_availability.dart';
+import 'public_format.dart';
 
+/// `.cal`: cabecera L M X J V S D y rejilla de días de 46 px de un mes.
 class PublicCalendar extends StatelessWidget {
   const PublicCalendar({
-    required this.rangeStart,
-    required this.rangeEnd,
+    required this.month,
     required this.availableDays,
     required this.selectedDate,
     required this.onSelectDate,
     super.key,
+    this.today,
   });
 
-  final DateTime rangeStart;
-  final DateTime rangeEnd;
+  /// Primer día del mes que se muestra.
+  final DateTime month;
   final List<AvailabilityDay> availableDays;
   final DateTime? selectedDate;
   final ValueChanged<DateTime> onSelectDate;
+  final DateTime? today;
 
   @override
   Widget build(BuildContext context) {
-    final dates = _datesInRange(rangeStart, rangeEnd);
-    final leading = (rangeStart.weekday - DateTime.monday) % 7;
+    final first = DateTime(month.year, month.month);
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    final leading = (first.weekday - DateTime.monday) % 7;
     final available = <String, AvailabilityDay>{
       for (final day in availableDays) _dateKey(day.date): day,
     };
-
+    final now = today ?? DateTime.now();
+    final cells = <Widget>[
+      for (var i = 0; i < leading; i++) const SizedBox.shrink(),
+      for (var d = 1; d <= daysInMonth; d++)
+        _cell(DateTime(month.year, month.month, d), available, now),
+    ];
+    final rows = (cells.length / 7).ceil();
     return Semantics(
       container: true,
       label: 'Calendario de disponibilidad',
-      child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 18, 12, 14),
-        decoration: BoxDecoration(
-          color: InkSlotColors.surface,
-          borderRadius: BorderRadius.circular(InkSlotRadii.card),
-          border: Border.all(color: InkSlotColors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Text(
-                _monthLabel(rangeStart, rangeEnd),
-                style: const TextStyle(
-                  color: InkSlotColors.cream,
-                  fontFamily: 'Instrument Serif',
-                  fontSize: 27,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              for (final label in const ['L', 'M', 'X', 'J', 'V', 'S', 'D'])
+                Expanded(
+                  child: Center(
+                    child: Text(
+                      label,
+                      style: inkSlotMono(
+                        size: 10,
+                        color: const Color(0xFF807B74),
+                      ),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Row(
+            ],
+          ),
+          const SizedBox(height: 8),
+          for (var r = 0; r < rows; r++) ...[
+            if (r > 0) const SizedBox(height: 6),
+            Row(
               children: [
-                _WeekdayLabel('L'),
-                _WeekdayLabel('M'),
-                _WeekdayLabel('M'),
-                _WeekdayLabel('J'),
-                _WeekdayLabel('V'),
-                _WeekdayLabel('S'),
-                _WeekdayLabel('D'),
+                for (var c = 0; c < 7; c++)
+                  Expanded(
+                    child: r * 7 + c < cells.length
+                        ? cells[r * 7 + c]
+                        : const SizedBox.shrink(),
+                  ),
               ],
             ),
-            const SizedBox(height: 5),
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: leading + dates.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-                mainAxisExtent: 52,
-              ),
-              itemBuilder: (context, index) {
-                if (index < leading) return const SizedBox.shrink();
-                final date = dates[index - leading];
-                final day = available[_dateKey(date)];
-                final isAvailable = day != null && day.slots.isNotEmpty;
-                final isSelected =
-                    selectedDate != null && _sameDate(selectedDate!, date);
-                return _CalendarDay(
-                  date: date,
-                  isAvailable: isAvailable,
-                  isSelected: isSelected,
-                  onTap: isAvailable ? () => onSelectDate(date) : null,
-                );
-              },
-            ),
           ],
-        ),
+        ],
       ),
     );
   }
-}
 
-class _WeekdayLabel extends StatelessWidget {
-  const _WeekdayLabel(this.label);
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Center(
-      child: Text(
-        label,
-        style: const TextStyle(
-          color: InkSlotColors.tertiary,
-          fontFamily: 'Geist Mono',
-          fontSize: 11,
-        ),
-      ),
-    ),
-  );
+  Widget _cell(
+    DateTime date,
+    Map<String, AvailabilityDay> available,
+    DateTime now,
+  ) {
+    final day = available[_dateKey(date)];
+    final slots = day?.slots.length ?? 0;
+    final selected = selectedDate != null && _sameDate(selectedDate!, date);
+    return _CalendarDay(
+      date: date,
+      slots: slots,
+      isSelected: selected,
+      isToday: _sameDate(now, date),
+      onTap: slots > 0 ? () => onSelectDate(date) : null,
+    );
+  }
 }
 
 class _CalendarDay extends StatelessWidget {
   const _CalendarDay({
     required this.date,
-    required this.isAvailable,
+    required this.slots,
     required this.isSelected,
+    required this.isToday,
     required this.onTap,
   });
 
   final DateTime date;
-  final bool isAvailable;
+  final int slots;
   final bool isSelected;
+  final bool isToday;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final label = '${_weekdayName(date.weekday)} ${date.day}';
+    final available = slots > 0;
+    final label =
+        '${publicWeekdaysLong[date.weekday - 1]} ${date.day} de '
+        '${publicMonths[date.month - 1]}'
+        '${available ? ', $slots horarios' : ', sin horarios'}';
     final foreground = isSelected
         ? InkSlotColors.ink
-        : isAvailable
-        ? InkSlotColors.cream
+        : available
+        ? InkSlotColors.bone
         : InkSlotColors.disabled;
-    return Semantics(
-      button: true,
-      enabled: isAvailable,
-      selected: isSelected,
-      label: isAvailable ? '$label, disponible' : '$label, no disponible',
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-        child: Center(
-          child: AnimatedContainer(
-            duration: MediaQuery.disableAnimationsOf(context)
-                ? Duration.zero
-                : InkSlotMotion.micro,
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: isSelected ? InkSlotColors.copper : Colors.transparent,
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: isSelected
-                    ? InkSlotColors.copperLight
-                    : Colors.transparent,
-              ),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Text(
-                  '${date.day}',
-                  style: TextStyle(
-                    color: foreground,
-                    fontSize: 15,
-                    fontWeight: isSelected || isAvailable
-                        ? FontWeight.w600
-                        : FontWeight.w400,
-                  ),
+    Widget body = AnimatedContainer(
+      duration: inkSlotReduceMotion(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 300),
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        color: isSelected ? InkSlotColors.copper : Colors.transparent,
+        shape: BoxShape.circle,
+        border: isToday && !isSelected
+            ? Border.all(color: const Color(0x38EEE9E0))
+            : null,
+        boxShadow: isSelected
+            ? const [
+                BoxShadow(
+                  color: Color(0x99C87939),
+                  blurRadius: 22,
+                  spreadRadius: -8,
+                  offset: Offset(0, 8),
                 ),
-                if (isAvailable && !isSelected)
-                  Positioned(
-                    bottom: 4,
-                    child: Container(
-                      width: 4,
-                      height: 4,
-                      decoration: const BoxDecoration(
-                        color: InkSlotColors.copper,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-              ],
+              ]
+            : null,
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            '${date.day}',
+            style: TextStyle(
+              color: foreground,
+              fontSize: 16,
+              height: 1.2,
+              fontWeight: available ? FontWeight.w500 : FontWeight.w400,
             ),
           ),
-        ),
+          if (available)
+            Container(
+              width: 4,
+              height: 4,
+              margin: const EdgeInsets.only(top: 3),
+              decoration: BoxDecoration(
+                color: isSelected ? InkSlotColors.ink : InkSlotColors.copper,
+                shape: BoxShape.circle,
+              ),
+            ),
+        ],
+      ),
+    );
+    if (isSelected && !inkSlotReduceMotion(context)) {
+      body = TweenAnimationBuilder<double>(
+        key: ValueKey('pop-${date.day}'),
+        tween: Tween(begin: .7, end: 1),
+        duration: const Duration(milliseconds: 450),
+        curve: const Cubic(.2, 1.6, .4, 1),
+        builder: (context, scale, child) =>
+            Transform.scale(scale: scale, child: child),
+        child: body,
+      );
+    }
+    return Semantics(
+      button: true,
+      enabled: available,
+      selected: isSelected,
+      label: label,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Center(child: body),
       ),
     );
   }
 }
-
-List<DateTime> _datesInRange(DateTime start, DateTime end) {
-  final dates = <DateTime>[];
-  for (
-    var date = DateTime(start.year, start.month, start.day);
-    !date.isAfter(end);
-    date = date.add(const Duration(days: 1))
-  ) {
-    dates.add(date);
-  }
-  return dates;
-}
-
-String _monthLabel(DateTime start, DateTime end) {
-  const months = <String>[
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
-  final first = '${months[start.month - 1]} ${start.year}';
-  final last = '${months[end.month - 1]} ${end.year}';
-  return first == last ? _capitalize(first) : '${_capitalize(first)} — $last';
-}
-
-String _capitalize(String value) =>
-    value.isEmpty ? value : value[0].toUpperCase() + value.substring(1);
-
-String _weekdayName(int weekday) => const <String>[
-  'Lunes',
-  'Martes',
-  'Miércoles',
-  'Jueves',
-  'Viernes',
-  'Sábado',
-  'Domingo',
-][weekday - 1];
 
 String _dateKey(DateTime value) =>
     '${value.year.toString().padLeft(4, '0')}-'

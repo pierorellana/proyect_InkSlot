@@ -23,13 +23,19 @@ void main() {
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
+      MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: MaterialApp.router(
+          theme: buildInkSlotTheme(),
+          routerConfig: router,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
     expect(find.byType(PublicReviewPage), findsOneWidget);
-    expect(find.text('ELIGE UN HORARIO PRIMERO'), findsOneWidget);
-    expect(find.text('Confirmar reserva'), findsNothing);
+    expect(find.text('Elige un horario primero'), findsOneWidget);
+    expect(find.text('Confirmar cita'), findsNothing);
   });
 
   testWidgets('deep-linked result route loads only the safe appointment DTO', (
@@ -44,12 +50,18 @@ void main() {
     addTearDown(controller.dispose);
 
     await tester.pumpWidget(
-      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
+      MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: MaterialApp.router(
+          theme: buildInkSlotTheme(),
+          routerConfig: router,
+        ),
+      ),
     );
     await tester.pumpAndSettle();
 
     expect(find.byType(PublicResultPage), findsOneWidget);
-    expect(find.text('Tu espacio está apartado.'), findsOneWidget);
+    expect(find.textContaining('Nos vemos el martes'), findsOneWidget);
   });
 }
 

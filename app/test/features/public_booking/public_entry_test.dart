@@ -5,6 +5,7 @@ import 'package:inkslot_app/core/router/app_router.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
 import 'package:inkslot_app/features/public_booking/data/public_reservation_repository.dart';
 import 'package:inkslot_app/features/public_booking/domain/public_reservation.dart';
+import 'package:inkslot_app/features/public_booking/presentation/public_dates_page.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_entry_controller.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_reservation_controller.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_splash_page.dart';
@@ -38,11 +39,14 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(
-      MaterialApp.router(
-        theme: buildInkSlotTheme(),
-        routerConfig: AppRouter.create(
-          initialLocation: '/r/test-token',
-          publicReservationController: _activePublicController(),
+      MediaQuery(
+        data: const MediaQueryData(disableAnimations: true),
+        child: MaterialApp.router(
+          theme: buildInkSlotTheme(),
+          routerConfig: AppRouter.create(
+            initialLocation: '/r/test-token',
+            publicReservationController: _activePublicController(),
+          ),
         ),
       ),
     );
@@ -51,10 +55,10 @@ void main() {
     expect(find.byType(PublicWelcomePage), findsOneWidget);
     expect(find.text('SALTAR INTRO'), findsNothing);
 
-    await tester.ensureVisible(find.text('Elegir fecha y hora'));
     await tester.tap(find.text('Elegir fecha y hora'));
     await tester.pumpAndSettle();
-    expect(find.text('Cargando tu reserva'), findsNothing);
+    expect(find.byType(PublicDatesPage), findsOneWidget);
+    expect(find.text('Elige un día'), findsOneWidget);
   });
 
   testWidgets('root skip action navigates to the welcome screen', (

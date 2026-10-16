@@ -32,12 +32,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Gio Ink'), findsOneWidget);
-    expect(find.text('Revisa tu espacio'), findsOneWidget);
-    expect(find.text('10:00 — 13:00'), findsOneWidget);
-    expect(find.text('Confirmar reserva'), findsOneWidget);
+    expect(find.text('Revisa y confirma'), findsOneWidget);
+    expect(find.text('Mar 20'), findsOneWidget);
+    expect(find.text('10:00'), findsOneWidget);
+    expect(find.text('13:00'), findsOneWidget);
+    expect(find.text('Confirmar cita'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Confirmar reserva'));
-    await tester.tap(find.text('Confirmar reserva'));
+    await tester.tap(find.text('Confirmar cita'));
     await tester.pumpAndSettle();
 
     expect(confirmed, isTrue);
@@ -63,10 +64,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('ELIGE UN HORARIO PRIMERO'), findsOneWidget);
-    expect(find.text('Confirmar reserva'), findsNothing);
+    expect(find.text('Elige un horario primero'), findsOneWidget);
+    expect(find.text('Confirmar cita'), findsNothing);
 
-    await tester.ensureVisible(find.text('Volver'));
     await tester.tap(find.text('Volver'));
     expect(returned, isTrue);
   });
@@ -93,14 +93,13 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('Confirmar reserva'));
-    await tester.tap(find.text('Confirmar reserva'));
+    await tester.tap(find.text('Confirmar cita'));
     await tester.pumpAndSettle();
 
-    expect(find.text('ESE HORARIO CAMBIÓ'), findsOneWidget);
+    expect(find.text('Ese horario se acaba de ocupar'), findsOneWidget);
+    expect(find.textContaining('Otra persona confirmó las 10:00'), findsOneWidget);
     expect(find.text('Reintentar'), findsNothing);
-    await tester.ensureVisible(find.text('Volver'));
-    await tester.tap(find.text('Volver'));
+    await tester.tap(find.text('Ver horarios actualizados'));
     expect(returned, isTrue);
   });
 
@@ -123,12 +122,43 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Revisa tu espacio'), findsOneWidget);
+    expect(find.text('Revisa y confirma'), findsOneWidget);
+  });
+
+  testWidgets('keeps the confirm action available after an agenda failure', (
+    tester,
+  ) async {
+    final repository = _ReviewRepository(
+      confirmationError: const ApiException(
+        code: 'CALENDAR_UNAVAILABLE',
+        message: 'Agenda no verificable',
+      ),
+    );
+    final controller = await _selectedController(repository);
+
+    await tester.pumpWidget(
+      _app(
+        PublicReviewPage(
+          token: 'safe-token',
+          controller: controller,
+          onBack: () {},
+          onConfirmed: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirmar cita'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No pudimos verificar la agenda'), findsOneWidget);
+    expect(find.text('Reintentar'), findsOneWidget);
   });
 }
 
-Widget _app(Widget child) =>
-    MaterialApp(theme: buildInkSlotTheme(), home: child);
+Widget _app(Widget child) => MediaQuery(
+  data: const MediaQueryData(disableAnimations: true),
+  child: MaterialApp(theme: buildInkSlotTheme(), home: child),
+);
 
 Future<PublicReservationController> _selectedController(
   _ReviewRepository repository,

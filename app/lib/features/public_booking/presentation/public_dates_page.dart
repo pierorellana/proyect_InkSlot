@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
-import '../../../core/widgets/inkslot_mono_label.dart';
+import '../../../core/widgets/inkslot_icon.dart';
+import '../../../core/widgets/inkslot_kit.dart';
+import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../domain/public_availability.dart';
 import '../domain/public_reservation.dart';
 import 'public_reservation_controller.dart';
+import 'public_studio_link.dart';
 import 'widgets/public_calendar.dart';
-import 'widgets/public_state_panel.dart';
+import 'widgets/public_chrome.dart';
+import 'widgets/public_format.dart';
 import 'widgets/public_time_wheel.dart';
-import 'widgets/public_time_zone_formatter.dart';
 
 class PublicDatesPage extends StatefulWidget {
   const PublicDatesPage({
@@ -17,20 +21,25 @@ class PublicDatesPage extends StatefulWidget {
     required this.controller,
     super.key,
     this.onReview,
+    this.onBack,
   });
 
   final String token;
   final PublicReservationController controller;
   final VoidCallback? onReview;
 
+  /// Volver a la bienvenida; por defecto va a `/r/:token` o hace `pop`.
+  final VoidCallback? onBack;
+
   @override
   State<PublicDatesPage> createState() => _PublicDatesPageState();
 }
 
 class _PublicDatesPageState extends State<PublicDatesPage> {
-  DateTime? _rangeStart;
-  DateTime? _rangeEnd;
+  int _step = 0;
+  DateTime? _month;
   bool _initialLoadScheduled = false;
+  DateTime? _pickedDate;
 
   @override
   void initState() {
@@ -42,8 +51,8 @@ class _PublicDatesPageState extends State<PublicDatesPage> {
   void didUpdateWidget(covariant PublicDatesPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.token != widget.token) {
-      _rangeStart = null;
-      _rangeEnd = null;
+      _month = null;
+      _step = 0;
       _initialLoadScheduled = false;
       _scheduleInitialLoad();
     }
@@ -66,448 +75,637 @@ class _PublicDatesPageState extends State<PublicDatesPage> {
       return;
     }
     if (status != PublicReservationStatus.active) return;
-    final range = _initialRange(widget.controller.reservation);
-    _loadRange(range.$1, range.$2);
+    _loadMonth(_initialMonth(widget.controller.reservation));
   }
 
-  void _loadRange(DateTime start, DateTime end) {
-    _rangeStart = start;
-    _rangeEnd = end;
+  void _loadMonth(DateTime month) {
+    final reservation = widget.controller.reservation;
+    final lower = _lowerBound(reservation);
+    final first = DateTime(month.year, month.month);
+    final start = first.isBefore(lower) ? lower : first;
+    final last = DateTime(month.year, month.month + 1, 0);
+    final maxDate = reservation?.restrictions.maxDate;
+    final end = maxDate != null && maxDate.isBefore(last) ? maxDate : last;
+    setState(() {
+      _month = first;
+      _step = 0;
+    });
     widget.controller.loadAvailability(widget.token, start, end);
   }
 
-  @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: InkSlotColors.deep,
-    body: SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) => SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 34),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
-              child: AnimatedBuilder(
-                animation: widget.controller,
-                builder: (context, _) {
-                  _scheduleAvailabilityAfterSummary();
-                  return _DatesContent(
-                    controller: widget.controller,
-                    rangeStart: _rangeStart,
-                    rangeEnd: _rangeEnd,
-                    onPrevious: _goPrevious,
-                    onNext: _goNext,
-                    onSelectDate: widget.controller.selectDate,
-                    onReview: widget.onReview,
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-
   void _scheduleAvailabilityAfterSummary() {
-    if (_rangeStart != null ||
+    final controller = widget.controller;
+    if (_month != null ||
         _initialLoadScheduled ||
-        widget.controller.reservationStatus != PublicReservationStatus.active ||
-        widget.controller.availabilityStatus ==
-            PublicAvailabilityStatus.loading ||
-        widget.controller.availabilityStatus ==
-            PublicAvailabilityStatus.ready ||
-        widget.controller.availabilityStatus ==
-            PublicAvailabilityStatus.empty ||
-        widget.controller.availabilityStatus ==
-            PublicAvailabilityStatus.error ||
-        widget.controller.availabilityStatus ==
-            PublicAvailabilityStatus.offline ||
-        widget.controller.availabilityStatus ==
-            PublicAvailabilityStatus.calendarUnavailable) {
+        controller.reservationStatus != PublicReservationStatus.active ||
+        controller.availabilityStatus != PublicAvailabilityStatus.idle) {
       return;
     }
     _initialLoadScheduled = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _rangeStart != null) return;
-      final range = _initialRange(widget.controller.reservation);
-      _loadRange(range.$1, range.$2);
+      if (!mounted || _month != null) return;
+      _loadMonth(_initialMonth(widget.controller.reservation));
     });
   }
 
-  void _goPrevious() {
-    final current = _rangeStart;
-    final reservation = widget.controller.reservation;
-    if (current == null || reservation == null) return;
-    final lowerBound = _lowerBound(reservation);
-    final nextStart = current.subtract(const Duration(days: 31));
-    final start = nextStart.isBefore(lowerBound) ? lowerBound : nextStart;
-    if (start.isAtSameMomentAs(current)) return;
-    _loadRange(start, _rangeEndFor(start, reservation));
+  void _goBack() {
+    if (_step == 1) {
+      setState(() => _step = 0);
+      return;
+    }
+    final onBack = widget.onBack;
+    if (onBack != null) {
+      onBack();
+      return;
+    }
+    final router = GoRouter.maybeOf(context);
+    if (router != null) {
+      router.go('/r/${widget.token}');
+    } else {
+      Navigator.of(context).maybePop();
+    }
   }
 
-  void _goNext() {
-    final current = _rangeStart;
-    final end = _rangeEnd;
-    final reservation = widget.controller.reservation;
-    if (current == null || end == null || reservation == null) return;
-    final upperBound = _upperBound(reservation, current);
-    if (!end.isBefore(upperBound)) return;
-    final nextStart = current.add(const Duration(days: 31));
-    final start = nextStart.isAfter(upperBound) ? upperBound : nextStart;
-    _loadRange(start, _rangeEndFor(start, reservation));
+  void _changeMonth(int delta) {
+    final month = _month;
+    if (month == null) return;
+    _loadMonth(DateTime(month.year, month.month + delta));
   }
-}
 
-class _DatesContent extends StatelessWidget {
-  const _DatesContent({
-    required this.controller,
-    required this.rangeStart,
-    required this.rangeEnd,
-    required this.onPrevious,
-    required this.onNext,
-    required this.onSelectDate,
-    required this.onReview,
-  });
-
-  final PublicReservationController controller;
-  final DateTime? rangeStart;
-  final DateTime? rangeEnd;
-  final VoidCallback onPrevious;
-  final VoidCallback onNext;
-  final ValueChanged<DateTime> onSelectDate;
-  final VoidCallback? onReview;
+  void _showTimes() {
+    final day = widget.controller.selectedDay;
+    if (day == null) return;
+    setState(() {
+      _pickedDate = day.date;
+      _step = 1;
+    });
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => PublicScreen(
+    animateIn: false,
+    builder: (context, safe) => AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, _) {
+        _scheduleAvailabilityAfterSummary();
+        return _content(context, safe);
+      },
+    ),
+  );
+
+  Widget _content(BuildContext context, EdgeInsets safe) {
+    final controller = widget.controller;
     final reservation = controller.reservation;
-    final reservationStatus = controller.reservationStatus;
+    final status = controller.reservationStatus;
     if (reservation == null ||
-        reservationStatus == PublicReservationStatus.loading ||
-        reservationStatus == PublicReservationStatus.idle) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 90),
-        child: PublicStatePanel(
-          kind: PublicStateKind.loading,
-          title: 'Cargando tu reserva',
-          message: 'Estamos preparando tus fechas disponibles.',
+        status == PublicReservationStatus.loading ||
+        status == PublicReservationStatus.idle) {
+      return _FramedScreen(
+        safe: safe,
+        step: 1,
+        onBack: _goBack,
+        backLabel: 'Volver',
+        child: const PublicBottomAligned(
+          alignment: Alignment.bottomLeft,
+          child: PublicTag(
+            'Cargando tu reserva',
+            color: InkSlotColors.copper,
+            live: true,
+          ),
         ),
       );
     }
-    if (reservationStatus != PublicReservationStatus.active) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 90),
-        child: PublicStatePanel(
-          kind: _reservationKind(reservationStatus),
-          title: _reservationTitle(reservationStatus),
-          message:
-              controller.reservationError ??
-              _reservationMessage(reservationStatus),
+    if (status == PublicReservationStatus.error) {
+      return _FramedScreen(
+        safe: safe,
+        step: 1,
+        onBack: _goBack,
+        backLabel: 'Volver',
+        child: PublicBottomAligned(
+          child: PublicStateBlock(
+            icon: InkSlotIcons.sinConexion,
+            title: 'No pudimos cargar la reserva',
+            message:
+                controller.reservationError ??
+                'Intenta nuevamente en unos momentos.',
+            onRetry: controller.retryReservation,
+          ),
         ),
+      );
+    }
+    if (status != PublicReservationStatus.active) {
+      return _FramedScreen(
+        safe: safe,
+        step: 1,
+        onBack: _goBack,
+        backLabel: 'Volver',
+        child: PublicBottomAligned(child: PublicBlockedMessage(status: status)),
       );
     }
 
     final availabilityStatus = controller.availabilityStatus;
-    if (availabilityStatus == PublicAvailabilityStatus.loading ||
-        availabilityStatus == PublicAvailabilityStatus.idle) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 90),
-        child: PublicStatePanel(
-          kind: PublicStateKind.loading,
-          title: 'Buscando horarios',
-          message: 'Consultando la agenda del estudio.',
-        ),
+    final timezone = controller.availability?.timezone ?? reservation.timezone;
+    final day = controller.selectedDay;
+    if (_step == 1 &&
+        availabilityStatus == PublicAvailabilityStatus.loading &&
+        _pickedDate != null) {
+      return _TimeScreen(
+        safe: safe,
+        date: _pickedDate!,
+        reservation: reservation,
+        timezone: timezone,
+        onBack: _goBack,
+        body: const _TimeLoading(),
       );
     }
-    if (availabilityStatus != PublicAvailabilityStatus.ready ||
-        controller.availability == null ||
-        rangeStart == null ||
-        rangeEnd == null) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 90),
-        child: PublicStatePanel(
-          kind: _availabilityKind(availabilityStatus),
-          title: _availabilityTitle(availabilityStatus),
-          message:
-              controller.availabilityError ??
-              _availabilityMessage(availabilityStatus),
-          onRetry:
-              availabilityStatus == PublicAvailabilityStatus.empty ||
-                  availabilityStatus == PublicAvailabilityStatus.error ||
-                  availabilityStatus == PublicAvailabilityStatus.offline ||
-                  availabilityStatus ==
-                      PublicAvailabilityStatus.calendarUnavailable
-              ? controller.retryAvailability
-              : null,
+    if (_step == 1 && day != null) {
+      return _TimeScreen(
+        safe: safe,
+        date: day.date,
+        reservation: reservation,
+        timezone: timezone,
+        onBack: _goBack,
+        body: _TimeBody(
+          slots: day.slots,
+          timezone: timezone,
+          selectedSlot: controller.selectedSlot,
+          onSelected: (slot) {
+            controller.selectSlot(slot);
+            widget.onReview?.call();
+          },
         ),
       );
     }
 
-    final availability = controller.availability!;
-    final selectedDay = controller.selectedDay;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: () => Navigator.of(context).maybePop(),
-              icon: const Icon(Icons.arrow_back),
-              tooltip: 'Volver',
-              constraints: const BoxConstraints(
-                minWidth: InkSlotSpacing.minimumTapTarget,
-                minHeight: InkSlotSpacing.minimumTapTarget,
+    final month = _month ?? _initialMonth(reservation);
+    final failed =
+        availabilityStatus == PublicAvailabilityStatus.error ||
+        availabilityStatus == PublicAvailabilityStatus.offline ||
+        availabilityStatus == PublicAvailabilityStatus.calendarUnavailable;
+    return _FramedScreen(
+      safe: safe,
+      step: 1,
+      onBack: _goBack,
+      backLabel: 'Volver',
+      scrollable: !failed,
+      header: _DayHeading(duration: reservation.durationMinutes),
+      child: failed
+          ? SingleChildScrollView(
+              child: _AvailabilityFailure(
+                status: availabilityStatus,
+                onRetry: controller.retryAvailability,
+              ),
+            )
+          : _CalendarBody(
+              month: month,
+              reservation: reservation,
+              controller: controller,
+              loading:
+                  availabilityStatus == PublicAvailabilityStatus.loading ||
+                  availabilityStatus == PublicAvailabilityStatus.idle,
+              onMonth: _changeMonth,
+              onSelectDate: controller.selectDate,
+              onShowTimes: _showTimes,
+            ),
+    );
+  }
+}
+
+/// Marco con cabecera de pasos y, opcionalmente, titular y contenido
+/// desplazable con el pie fijo.
+class _FramedScreen extends StatelessWidget {
+  const _FramedScreen({
+    required this.safe,
+    required this.step,
+    required this.onBack,
+    required this.backLabel,
+    required this.child,
+    this.header,
+    this.scrollable = false,
+  });
+
+  final EdgeInsets safe;
+  final int step;
+  final VoidCallback onBack;
+  final String backLabel;
+  final Widget child;
+  final Widget? header;
+  final bool scrollable;
+
+  @override
+  Widget build(BuildContext context) => InkSlotScreenIn(
+    child: Padding(
+      padding: EdgeInsets.fromLTRB(20, safe.top, 20, safe.bottom),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          PublicStepHeader(step: step, onBack: onBack, backLabel: backLabel),
+          if (header != null) ...[const SizedBox(height: 28), header!],
+          if (scrollable)
+            Expanded(child: child)
+          else
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: child,
               ),
             ),
-            const Spacer(),
-            InkSlotMonoLabel(
-              'Duración ${_durationLabel(reservation.durationMinutes)}',
-            ),
-          ],
-        ),
-        const SizedBox(height: 30),
-        const Text(
-          'Elige tu fecha',
-          style: TextStyle(
-            color: InkSlotColors.cream,
-            fontFamily: 'Instrument Serif',
-            fontSize: 44,
-            height: 1,
-          ),
-        ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _DayHeading extends StatelessWidget {
+  const _DayHeading({required this.duration});
+
+  final int duration;
+
+  @override
+  Widget build(BuildContext context) => InkSlotRise(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const PublicHeading('Elige un día'),
         const SizedBox(height: 10),
         Text(
-          'Horarios en ${reservation.timezone}. Solo mostramos espacios verificables.',
+          'Solo se activan los días con espacio para tu sesión completa de '
+          '${publicDurationLabel(duration)}.',
           style: const TextStyle(
             color: InkSlotColors.secondary,
             fontSize: 15,
-            height: 1.4,
+            height: 1.45,
           ),
         ),
-        const SizedBox(height: 24),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              onPressed: _canGoPrevious(rangeStart!, reservation)
-                  ? onPrevious
-                  : null,
-              icon: const Icon(Icons.chevron_left_rounded),
-              tooltip: 'Rango anterior',
+      ],
+    ),
+  );
+}
+
+class _CalendarBody extends StatelessWidget {
+  const _CalendarBody({
+    required this.month,
+    required this.reservation,
+    required this.controller,
+    required this.loading,
+    required this.onMonth,
+    required this.onSelectDate,
+    required this.onShowTimes,
+  });
+
+  final DateTime month;
+  final PublicReservation reservation;
+  final PublicReservationController controller;
+  final bool loading;
+  final ValueChanged<int> onMonth;
+  final ValueChanged<DateTime> onSelectDate;
+  final VoidCallback onShowTimes;
+
+  @override
+  Widget build(BuildContext context) {
+    final availability = controller.availability;
+    final selected = controller.selectedDay;
+    final lower = _lowerBound(reservation);
+    final canPrevious = month.isAfter(DateTime(lower.year, lower.month));
+    final canNext = !DateTime(
+      month.year,
+      month.month + 1,
+    ).isAfter(_horizon(reservation));
+    final empty =
+        controller.availabilityStatus == PublicAvailabilityStatus.empty;
+    Widget calendar = PublicCalendar(
+      month: month,
+      availableDays: availability?.days ?? const <AvailabilityDay>[],
+      selectedDate: selected?.date,
+      onSelectDate: onSelectDate,
+    );
+    if (loading) {
+      calendar = InkSlotPulse(
+        duration: const Duration(milliseconds: 1200),
+        minOpacity: .5,
+        child: calendar,
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                InkSlotRise.step(
+                  1,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 26),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${publicCapitalize(publicMonths[month.month - 1])} '
+                          '${month.year}',
+                          style: inkSlotSerif(26),
+                        ),
+                        Row(
+                          children: [
+                            InkSlotIconButton(
+                              icon: InkSlotIcons.volver,
+                              iconSize: 16,
+                              semanticLabel: 'Mes anterior',
+                              onPressed: canPrevious && !loading
+                                  ? () => onMonth(-1)
+                                  : null,
+                            ),
+                            const SizedBox(width: 8),
+                            InkSlotIconButton(
+                              icon: InkSlotIcons.avanzar,
+                              iconSize: 16,
+                              semanticLabel: 'Mes siguiente',
+                              onPressed: canNext && !loading
+                                  ? () => onMonth(1)
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                InkSlotRise.step(
+                  2,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 16),
+                    child: calendar,
+                  ),
+                ),
+                if (empty)
+                  InkSlotRise.step(
+                    3,
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 18),
+                      child: _NoSlotsCard(
+                        onContact: () => contactPublicStudio(context),
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            IconButton(
-              onPressed: _canGoNext(rangeStart!, rangeEnd!, reservation)
-                  ? onNext
-                  : null,
-              icon: const Icon(Icons.chevron_right_rounded),
-              tooltip: 'Rango siguiente',
-            ),
-          ],
+          ),
         ),
-        PublicCalendar(
-          rangeStart: rangeStart!,
-          rangeEnd: rangeEnd!,
-          availableDays: availability.days,
-          selectedDate: selectedDay?.date,
-          onSelectDate: onSelectDate,
+        Text.rich(
+          TextSpan(
+            children: [
+              WidgetSpan(
+                alignment: PlaceholderAlignment.middle,
+                child: Container(
+                  width: 4,
+                  height: 4,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: const BoxDecoration(
+                    color: InkSlotColors.copper,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              TextSpan(
+                text: 'CON HORARIOS LIBRES',
+                style: inkSlotMono(size: 9, color: InkSlotColors.tertiary),
+              ),
+            ],
+          ),
+          textAlign: TextAlign.center,
         ),
-        if (selectedDay != null) ...[
-          const SizedBox(height: 28),
-          const InkSlotMonoLabel(
-            'Selecciona una hora',
-            color: InkSlotColors.copperLight,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            _dateLabel(selectedDay.date),
-            style: const TextStyle(
-              color: InkSlotColors.cream,
-              fontFamily: 'Instrument Serif',
-              fontSize: 30,
-            ),
-          ),
-          const SizedBox(height: 4),
-          PublicTimeWheel(
-            slots: selectedDay.slots,
-            timezone: availability.timezone,
-            selectedSlot: controller.selectedSlot,
-            onSelected: controller.selectSlot,
-          ),
-          if (controller.selectedSlot != null)
-            _SelectedSlotNotice(
-              slot: controller.selectedSlot!,
-              timezone: availability.timezone,
-            ),
-          if (controller.selectedSlot != null && onReview != null) ...[
-            const SizedBox(height: 16),
-            InkSlotPrimaryButton(
-              label: 'Revisar y confirmar',
-              onPressed: onReview,
-              trailing: const Icon(Icons.arrow_forward, size: 22),
-            ),
-          ],
-        ],
+        const SizedBox(height: 12),
+        InkSlotPrimaryButton(
+          label: selected == null
+              ? 'Selecciona un día'
+              : 'Ver horarios del ${publicWeekdaysShort[selected.date.weekday - 1]} '
+                    '${selected.date.day}',
+          onPressed: selected == null ? null : onShowTimes,
+        ),
       ],
     );
   }
 }
 
-class _SelectedSlotNotice extends StatelessWidget {
-  const _SelectedSlotNotice({required this.slot, required this.timezone});
+class _NoSlotsCard extends StatelessWidget {
+  const _NoSlotsCard({required this.onContact});
 
-  final AvailabilitySlot slot;
-  final String timezone;
+  final VoidCallback onContact;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    liveRegion: true,
-    label: 'Horario seleccionado ${_formatTime(slot.startAt, timezone)}',
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: InkSlotColors.tobacco,
-        borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-        border: Border.all(color: InkSlotColors.copperGlow),
-      ),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.check_circle_outline,
-            color: InkSlotColors.copperLight,
+  Widget build(BuildContext context) => InkSlotCard(
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Aún no hay horarios disponibles',
+          style: TextStyle(
+            color: InkSlotColors.bone,
+            fontSize: 16,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Horario seleccionado · ${_formatTime(slot.startAt, timezone)}',
-              style: const TextStyle(color: InkSlotColors.cream, fontSize: 15),
-            ),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          'El estudio no tiene espacios dentro de tu rango por ahora. Tu solicitud sigue activa: escríbele para coordinar.',
+          style: TextStyle(
+            color: InkSlotColors.secondary,
+            fontSize: 14,
+            height: 1.45,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 10),
+        InkSlotPress(
+          onTap: onContact,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Escribir al estudio',
+                style: TextStyle(
+                  color: InkSlotColors.bone,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                  decorationColor: InkSlotColors.bone,
+                ),
+              ),
+              SizedBox(width: 6),
+              InkSlotIcon(InkSlotIcons.flechaDerecha, size: 14),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }
 
-PublicStateKind _reservationKind(PublicReservationStatus status) =>
-    switch (status) {
-      PublicReservationStatus.expired => PublicStateKind.expired,
-      PublicReservationStatus.revoked => PublicStateKind.revoked,
-      PublicReservationStatus.booked => PublicStateKind.booked,
-      _ => PublicStateKind.error,
-    };
+class _AvailabilityFailure extends StatelessWidget {
+  const _AvailabilityFailure({required this.status, required this.onRetry});
 
-String _reservationTitle(PublicReservationStatus status) => switch (status) {
-  PublicReservationStatus.expired => 'Este enlace expiró',
-  PublicReservationStatus.revoked => 'Este enlace ya no está disponible',
-  PublicReservationStatus.booked => 'Esta reserva ya está agendada',
-  _ => 'No pudimos cargar la reserva',
-};
+  final PublicAvailabilityStatus status;
+  final VoidCallback onRetry;
 
-String _reservationMessage(PublicReservationStatus status) => switch (status) {
-  PublicReservationStatus.expired =>
-    'Solicita un nuevo enlace al estudio para continuar.',
-  PublicReservationStatus.revoked =>
-    'Solicita al estudio que revise tu reserva.',
-  PublicReservationStatus.booked =>
-    'El horario de esta solicitud ya fue confirmado.',
-  _ => 'Intenta nuevamente en unos momentos.',
-};
-
-PublicStateKind _availabilityKind(PublicAvailabilityStatus status) =>
-    switch (status) {
-      PublicAvailabilityStatus.empty => PublicStateKind.empty,
-      PublicAvailabilityStatus.calendarUnavailable =>
-        PublicStateKind.calendarUnavailable,
-      PublicAvailabilityStatus.offline => PublicStateKind.offline,
-      _ => PublicStateKind.error,
-    };
-
-String _availabilityTitle(PublicAvailabilityStatus status) => switch (status) {
-  PublicAvailabilityStatus.empty => 'No hay horarios disponibles',
-  PublicAvailabilityStatus.calendarUnavailable => 'Agenda no verificable',
-  PublicAvailabilityStatus.offline => 'Sin conexión',
-  _ => 'No pudimos cargar los horarios',
-};
-
-String _availabilityMessage(PublicAvailabilityStatus status) =>
-    switch (status) {
-      PublicAvailabilityStatus.empty =>
-        'Prueba otro rango o escribe al estudio para coordinar.',
-      PublicAvailabilityStatus.calendarUnavailable =>
-        'No mostraremos horarios hasta poder verificar la agenda del estudio.',
-      PublicAvailabilityStatus.offline =>
+  @override
+  Widget build(BuildContext context) {
+    final (icon, tone, title, message) = switch (status) {
+      PublicAvailabilityStatus.calendarUnavailable => (
+        InkSlotIcons.calendarioAlerta,
+        PublicStateTone.warning,
+        'No pudimos verificar la agenda',
+        'Para no ofrecerte una hora que quizás ya esté ocupada, esperamos a confirmarla con el estudio.',
+      ),
+      PublicAvailabilityStatus.offline => (
+        InkSlotIcons.sinConexion,
+        PublicStateTone.neutral,
+        'Sin conexión',
         'Revisa tu conexión e intenta nuevamente.',
-      _ => 'Intenta nuevamente en unos momentos.',
+      ),
+      _ => (
+        InkSlotIcons.alerta,
+        PublicStateTone.warning,
+        'No pudimos cargar los horarios',
+        'Intenta nuevamente en unos momentos.',
+      ),
     };
-
-(DateTime, DateTime) _initialRange(PublicReservation? reservation) {
-  final today = _dateOnly(DateTime.now());
-  final minDate = reservation?.restrictions.minDate;
-  final maxDate = reservation?.restrictions.maxDate;
-  var start = minDate != null && minDate.isAfter(today) ? minDate : today;
-  if (maxDate != null && maxDate.isBefore(start)) start = maxDate;
-  return (start, _rangeEndFor(start, reservation));
+    return Padding(
+      padding: const EdgeInsets.only(top: 76),
+      child: PublicStateBlock(
+        icon: icon,
+        tone: tone,
+        title: title,
+        message: message,
+        onRetry: onRetry,
+      ),
+    );
+  }
 }
 
-DateTime _lowerBound(PublicReservation reservation) {
-  final today = _dateOnly(DateTime.now());
-  final minDate = reservation.restrictions.minDate;
-  return minDate != null && minDate.isAfter(today) ? minDate : today;
+class _TimeScreen extends StatelessWidget {
+  const _TimeScreen({
+    required this.safe,
+    required this.date,
+    required this.reservation,
+    required this.timezone,
+    required this.onBack,
+    required this.body,
+  });
+
+  final EdgeInsets safe;
+  final DateTime date;
+  final PublicReservation reservation;
+  final String timezone;
+  final VoidCallback onBack;
+  final Widget body;
+
+  @override
+  Widget build(BuildContext context) => InkSlotScreenIn(
+    child: Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned(
+          top: safe.top,
+          left: 20,
+          right: 20,
+          child: PublicStepHeader(
+            step: 2,
+            onBack: onBack,
+            backLabel: 'Volver al calendario',
+          ),
+        ),
+        Positioned(
+          top: safe.top + 70,
+          left: 24,
+          right: 24,
+          child: InkSlotRise(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PublicHeading(
+                  '${publicCapitalize(publicWeekdaysLong[date.weekday - 1])} '
+                  '${date.day} ${publicMonthShort(date.month - 1)}',
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sesión de ${publicDurationShort(reservation.durationMinutes)}'
+                  ' · ${publicZoneDescription(timezone)}',
+                  style: const TextStyle(
+                    color: InkSlotColors.secondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        Positioned.fill(
+          top: safe.top + 178,
+          bottom: safe.bottom - InkSlotSpacing.safeAreaBottomReference + 42,
+          child: body,
+        ),
+      ],
+    ),
+  );
 }
 
-DateTime _upperBound(PublicReservation reservation, DateTime currentStart) =>
-    reservation.restrictions.maxDate ??
-    currentStart.add(const Duration(days: 30));
+class _TimeBody extends StatelessWidget {
+  const _TimeBody({
+    required this.slots,
+    required this.timezone,
+    required this.selectedSlot,
+    required this.onSelected,
+  });
 
-DateTime _rangeEndFor(DateTime start, PublicReservation? reservation) {
-  final candidate = start.add(const Duration(days: 30));
-  final maxDate = reservation?.restrictions.maxDate;
-  return maxDate != null && maxDate.isBefore(candidate) ? maxDate : candidate;
+  final List<AvailabilitySlot> slots;
+  final String timezone;
+  final AvailabilitySlot? selectedSlot;
+  final ValueChanged<AvailabilitySlot> onSelected;
+
+  @override
+  Widget build(BuildContext context) => PublicTimeWheel(
+    slots: slots,
+    timezone: timezone,
+    selectedSlot: selectedSlot,
+    onSelected: onSelected,
+  );
 }
 
-bool _canGoPrevious(DateTime start, PublicReservation reservation) =>
-    start.isAfter(_lowerBound(reservation));
+class _TimeLoading extends StatelessWidget {
+  const _TimeLoading();
 
-bool _canGoNext(DateTime start, DateTime end, PublicReservation reservation) =>
-    end.isBefore(_upperBound(reservation, start));
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      const Expanded(child: PublicTimeWheelSkeleton()),
+      const SizedBox(height: 22),
+      Text(
+        'CONSULTANDO LA AGENDA DEL ESTUDIO…',
+        textAlign: TextAlign.center,
+        style: inkSlotMono(color: InkSlotColors.tertiary),
+      ),
+      const SizedBox(height: 22),
+    ],
+  );
+}
 
 DateTime _dateOnly(DateTime value) =>
     DateTime(value.year, value.month, value.day);
 
-String _dateLabel(DateTime value) {
-  const weekdays = <String>[
-    'lunes',
-    'martes',
-    'miércoles',
-    'jueves',
-    'viernes',
-    'sábado',
-    'domingo',
-  ];
-  const months = <String>[
-    'enero',
-    'febrero',
-    'marzo',
-    'abril',
-    'mayo',
-    'junio',
-    'julio',
-    'agosto',
-    'septiembre',
-    'octubre',
-    'noviembre',
-    'diciembre',
-  ];
-  return '${weekdays[value.weekday - 1]}, ${value.day} de ${months[value.month - 1]}';
+DateTime _lowerBound(PublicReservation? reservation) {
+  final today = _dateOnly(DateTime.now());
+  final minDate = reservation?.restrictions.minDate;
+  return minDate != null && minDate.isAfter(today) ? minDate : today;
 }
 
-String _durationLabel(int minutes) {
-  final hours = minutes ~/ 60;
-  final remainder = minutes % 60;
-  if (remainder == 0) return hours == 1 ? '1 hora' : '$hours horas';
-  return '${hours}h ${remainder}m';
-}
+DateTime _horizon(PublicReservation reservation) =>
+    reservation.restrictions.maxDate ??
+    _lowerBound(reservation).add(const Duration(days: 61));
 
-String _formatTime(DateTime utc, String timezone) {
-  return formatPublicTime(utc, timezone);
+DateTime _initialMonth(PublicReservation? reservation) {
+  var start = _lowerBound(reservation);
+  final maxDate = reservation?.restrictions.maxDate;
+  if (maxDate != null && maxDate.isBefore(start)) start = maxDate;
+  return DateTime(start.year, start.month);
 }
