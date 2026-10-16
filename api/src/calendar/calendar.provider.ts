@@ -41,6 +41,7 @@ export type CalendarProviderErrorCode =
   | 'CALENDAR_UNAVAILABLE'
   | 'CALENDAR_REAUTH_REQUIRED'
   | 'CALENDAR_EVENT_EXISTS'
+  | 'CALENDAR_EVENT_NOT_FOUND'
   | 'OAUTH_ACCESS_DENIED';
 
 export class CalendarProviderError extends Error {
@@ -59,6 +60,12 @@ export interface CalendarProvider {
   listCalendars(refreshToken: string): Promise<CalendarSummary[]>;
   freeBusy(input: CalendarBusyQuery): Promise<CalendarBusyInterval[]>;
   createEvent(input: CalendarEventInput): Promise<CalendarEventResult>;
+  updateEvent(input: CalendarEventInput): Promise<CalendarEventResult>;
+  deleteEvent(input: {
+    refreshToken: string;
+    calendarId: string;
+    eventId: string;
+  }): Promise<void>;
   getEvent(input: {
     refreshToken: string;
     calendarId: string;

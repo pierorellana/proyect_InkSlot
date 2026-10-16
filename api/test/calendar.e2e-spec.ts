@@ -47,6 +47,11 @@ describe('admin calendar connection', () => {
       etag: null,
     }),
     getEvent: jest.fn().mockResolvedValue(null),
+    updateEvent: jest.fn().mockResolvedValue({
+      externalEventId: 'google-event-id',
+      etag: null,
+    }),
+    deleteEvent: jest.fn().mockResolvedValue(undefined),
     revoke: jest.fn().mockResolvedValue(undefined),
   } as jest.Mocked<CalendarProvider>;
 

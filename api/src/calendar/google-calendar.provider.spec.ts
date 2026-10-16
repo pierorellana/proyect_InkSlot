@@ -49,6 +49,14 @@ describe('GoogleCalendarProvider.freeBusy', () => {
     Promise<{ data: calendar_v3.Schema$Event }>,
     [calendar_v3.Params$Resource$Events$Get]
   >;
+  let update: jest.Mock<
+    Promise<{ data: calendar_v3.Schema$Event }>,
+    [calendar_v3.Params$Resource$Events$Update]
+  >;
+  let remove: jest.Mock<
+    Promise<unknown>,
+    [calendar_v3.Params$Resource$Events$Delete]
+  >;
 
   beforeEach(() => {
     query = jest.fn<
@@ -60,9 +68,11 @@ describe('GoogleCalendarProvider.freeBusy', () => {
     });
     insert = jest.fn();
     get = jest.fn();
+    update = jest.fn();
+    remove = jest.fn();
     jest.spyOn(google, 'calendar').mockReturnValue({
       freebusy: { query },
-      events: { insert, get },
+      events: { insert, get, update, delete: remove },
     } as never);
     provider = new GoogleCalendarProvider(config);
   });
@@ -336,6 +346,92 @@ describe('GoogleCalendarProvider.freeBusy', () => {
     });
   });
 
+  it('updates an event with the same deterministic id and full projection', async () => {
+    update.mockResolvedValue({
+      data: { id: eventInput.eventId, etag: '"updated-etag"' },
+    });
+
+    await expect(provider.updateEvent(eventInput)).resolves.toEqual({
+      externalEventId: eventInput.eventId,
+      etag: '"updated-etag"',
+    });
+    expect(update).toHaveBeenCalledWith({
+      calendarId: eventInput.calendarId,
+      eventId: eventInput.eventId,
+      sendUpdates: 'none',
+      requestBody: {
+        summary: eventInput.summary,
+        description: eventInput.description,
+        start: {
+          dateTime: eventInput.startAt.toISOString(),
+          timeZone: eventInput.timeZone,
+        },
+        end: {
+          dateTime: eventInput.endAt.toISOString(),
+          timeZone: eventInput.timeZone,
+        },
+      },
+    });
+  });
+
+  it('maps a missing event during update to a typed not-found error', async () => {
+    update.mockRejectedValue({ response: { status: 404 }, message: rawMessage });
+
+    await expectSafeEventError('CALENDAR_EVENT_NOT_FOUND', () =>
+      provider.updateEvent(eventInput),
+    );
+  });
+
+  it.each([
+    [{ response: { status: 401 } }, 'CALENDAR_REAUTH_REQUIRED'],
+    [{ response: { status: 403 } }, 'CALENDAR_REAUTH_REQUIRED'],
+    [{ response: { status: 409 } }, 'CALENDAR_EVENT_EXISTS'],
+    [{ response: { status: 500 } }, 'CALENDAR_UNAVAILABLE'],
+  ] as const)('maps update failure %j safely', async (error, code) => {
+    update.mockRejectedValue({ ...error, message: rawMessage });
+
+    await expectSafeEventError(code, () => provider.updateEvent(eventInput));
+  });
+
+  it('deletes an event by the same deterministic id without notifications', async () => {
+    remove.mockResolvedValue({ data: {} });
+
+    await expect(provider.deleteEvent({
+      refreshToken: eventInput.refreshToken,
+      calendarId: eventInput.calendarId,
+      eventId: eventInput.eventId,
+    })).resolves.toBeUndefined();
+    expect(remove).toHaveBeenCalledWith({
+      calendarId: eventInput.calendarId,
+      eventId: eventInput.eventId,
+      sendUpdates: 'none',
+    });
+  });
+
+  it('treats a missing event during delete as an idempotent success', async () => {
+    remove.mockRejectedValue({ response: { status: 404 }, message: rawMessage });
+
+    await expect(provider.deleteEvent({
+      refreshToken: eventInput.refreshToken,
+      calendarId: eventInput.calendarId,
+      eventId: eventInput.eventId,
+    })).resolves.toBeUndefined();
+  });
+
+  it.each([
+    [{ response: { status: 401 } }, 'CALENDAR_REAUTH_REQUIRED'],
+    [{ response: { status: 403 } }, 'CALENDAR_REAUTH_REQUIRED'],
+    [{ response: { status: 500 } }, 'CALENDAR_UNAVAILABLE'],
+  ] as const)('maps delete failure %j safely', async (error, code) => {
+    remove.mockRejectedValue({ ...error, message: rawMessage });
+
+    await expectSafeEventError(code, () => provider.deleteEvent({
+      refreshToken: eventInput.refreshToken,
+      calendarId: eventInput.calendarId,
+      eventId: eventInput.eventId,
+    }));
+  });
+
   it('returns null when the deterministic event is absent', async () => {
     get.mockRejectedValue({ response: { status: 404 }, message: rawMessage });
 
@@ -377,10 +473,11 @@ describe('GoogleCalendarProvider.freeBusy', () => {
 
   async function expectSafeEventError(
     code: CalendarProviderErrorCode,
+    action: () => Promise<unknown> = () => provider.createEvent(eventInput),
   ): Promise<void> {
-    const error: unknown = await provider
-      .createEvent(eventInput)
-      .catch((failure: unknown) => failure);
+    const error: unknown = await action().catch(
+      (failure: unknown) => failure,
+    );
     expect(error).toBeInstanceOf(CalendarProviderError);
     if (!(error instanceof CalendarProviderError)) {
       throw new Error('Expected a CalendarProviderError');

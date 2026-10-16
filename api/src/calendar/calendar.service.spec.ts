@@ -78,6 +78,14 @@ describe('CalendarService.queryBusy', () => {
       ReturnType<CalendarProvider['getEvent']>,
       Parameters<CalendarProvider['getEvent']>
     >(),
+    updateEvent: jest.fn<
+      ReturnType<CalendarProvider['updateEvent']>,
+      Parameters<CalendarProvider['updateEvent']>
+    >(),
+    deleteEvent: jest.fn<
+      ReturnType<CalendarProvider['deleteEvent']>,
+      Parameters<CalendarProvider['deleteEvent']>
+    >(),
     revoke: jest.fn(),
   } satisfies jest.Mocked<CalendarProvider>;
   let input: CalendarBusyQueryInput;
@@ -228,6 +236,103 @@ describe('CalendarService.queryBusy', () => {
       refreshToken,
       calendarId: connection.calendarId,
       eventId: eventInput.eventId,
+    });
+  });
+
+  it('updates an event through the selected connected calendar without exposing the token', async () => {
+    const result = {
+      externalEventId: eventInput.eventId,
+      etag: '"updated-etag"',
+    };
+    provider.updateEvent.mockResolvedValue(result);
+
+    await expect(
+      service.updateEvent(artistId, eventInput),
+    ).resolves.toEqual(result);
+    expect(crypto.decrypt).toHaveBeenCalledWith(
+      connection.encryptedRefreshToken,
+    );
+    expect(provider.updateEvent).toHaveBeenCalledWith({
+      ...eventInput,
+      refreshToken,
+    });
+  });
+
+  it('deletes an event through the selected connected calendar without exposing the token', async () => {
+    provider.deleteEvent.mockResolvedValue(undefined);
+
+    await expect(
+      service.deleteEvent(artistId, eventInput.eventId),
+    ).resolves.toBeUndefined();
+    expect(crypto.decrypt).toHaveBeenCalledWith(
+      connection.encryptedRefreshToken,
+    );
+    expect(provider.deleteEvent).toHaveBeenCalledWith({
+      refreshToken,
+      calendarId: connection.calendarId,
+      eventId: eventInput.eventId,
+    });
+  });
+
+  it('marks the connection for reauthorization when update fails with a provider auth error', async () => {
+    provider.updateEvent.mockRejectedValue(
+      new CalendarProviderError('CALENDAR_REAUTH_REQUIRED', rawDetail),
+    );
+
+    const error: unknown = await service
+      .updateEvent(artistId, eventInput)
+      .catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(CalendarProviderError);
+    if (!(error instanceof CalendarProviderError)) {
+      throw new Error('Expected a CalendarProviderError');
+    }
+    expect(error.code).toBe('CALENDAR_REAUTH_REQUIRED');
+    expect(error.message).not.toContain(rawDetail);
+    expect(error.message).not.toContain(refreshToken);
+    expect(prisma.calendarConnection.updateMany).toHaveBeenCalledWith({
+      where: { artistId },
+      data: { status: CalendarConnectionStatus.NEEDS_RECONNECT },
+    });
+  });
+
+  it('preserves the typed not-found error for an update without leaking provider details', async () => {
+    provider.updateEvent.mockRejectedValue(
+      new CalendarProviderError('CALENDAR_EVENT_NOT_FOUND', rawDetail),
+    );
+
+    const error: unknown = await service
+      .updateEvent(artistId, eventInput)
+      .catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(CalendarProviderError);
+    if (!(error instanceof CalendarProviderError)) {
+      throw new Error('Expected a CalendarProviderError');
+    }
+    expect(error.code).toBe('CALENDAR_EVENT_NOT_FOUND');
+    expect(error.message).not.toContain(rawDetail);
+    expect(error.message).not.toContain(refreshToken);
+  });
+
+  it('marks the connection for reauthorization when delete fails with a provider auth error', async () => {
+    provider.deleteEvent.mockRejectedValue(
+      new CalendarProviderError('CALENDAR_REAUTH_REQUIRED', rawDetail),
+    );
+
+    const error: unknown = await service
+      .deleteEvent(artistId, eventInput.eventId)
+      .catch((failure: unknown) => failure);
+
+    expect(error).toBeInstanceOf(CalendarProviderError);
+    if (!(error instanceof CalendarProviderError)) {
+      throw new Error('Expected a CalendarProviderError');
+    }
+    expect(error.code).toBe('CALENDAR_REAUTH_REQUIRED');
+    expect(error.message).not.toContain(rawDetail);
+    expect(error.message).not.toContain(refreshToken);
+    expect(prisma.calendarConnection.updateMany).toHaveBeenCalledWith({
+      where: { artistId },
+      data: { status: CalendarConnectionStatus.NEEDS_RECONNECT },
     });
   });
 

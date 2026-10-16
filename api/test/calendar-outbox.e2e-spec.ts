@@ -123,6 +123,59 @@ class FakeCalendarProvider implements CalendarProvider {
       this.externalEvents.get(input.eventId) ?? null,
   );
 
+  readonly updateEvent = jest.fn(
+    async (input: CalendarEventInput): Promise<CalendarEventResult> => {
+      if (this.mode === 'reauth') {
+        throw new CalendarProviderError(
+          'CALENDAR_REAUTH_REQUIRED',
+          'provider token must not escape',
+        );
+      }
+      if (this.mode === 'unavailable') {
+        throw new CalendarProviderError(
+          'CALENDAR_UNAVAILABLE',
+          'provider outage must not escape',
+        );
+      }
+
+      if (!this.externalEvents.has(input.eventId)) {
+        throw new CalendarProviderError(
+          'CALENDAR_EVENT_NOT_FOUND',
+          'external event is missing',
+        );
+      }
+
+      const result = {
+        externalEventId: input.eventId,
+        etag: `etag-${input.eventId}`,
+      };
+      this.externalEvents.set(input.eventId, result);
+      return result;
+    },
+  );
+
+  readonly deleteEvent = jest.fn(
+    async (input: {
+      refreshToken: string;
+      calendarId: string;
+      eventId: string;
+    }): Promise<void> => {
+      if (this.mode === 'reauth') {
+        throw new CalendarProviderError(
+          'CALENDAR_REAUTH_REQUIRED',
+          'provider token must not escape',
+        );
+      }
+      if (this.mode === 'unavailable') {
+        throw new CalendarProviderError(
+          'CALENDAR_UNAVAILABLE',
+          'provider outage must not escape',
+        );
+      }
+      this.externalEvents.delete(input.eventId);
+    },
+  );
+
   readonly revoke = jest.fn().mockResolvedValue(undefined);
 
   reset(): void {
@@ -136,6 +189,8 @@ class FakeCalendarProvider implements CalendarProvider {
     this.freeBusy.mockClear();
     this.createEvent.mockClear();
     this.getEvent.mockClear();
+    this.updateEvent.mockClear();
+    this.deleteEvent.mockClear();
     this.revoke.mockClear();
   }
 }

@@ -156,6 +156,37 @@ export class CalendarService {
     }
   }
 
+  async updateEvent(
+    artistId: string,
+    input: CalendarEventInput,
+  ): Promise<CalendarEventResult> {
+    const connection = await this.loadEventConnection(artistId);
+
+    try {
+      return await this.provider.updateEvent({
+        ...input,
+        refreshToken: connection.refreshToken,
+        calendarId: connection.calendarId,
+      });
+    } catch (error) {
+      return this.throwSafeEventError(artistId, error);
+    }
+  }
+
+  async deleteEvent(artistId: string, eventId: string): Promise<void> {
+    const connection = await this.loadEventConnection(artistId);
+
+    try {
+      await this.provider.deleteEvent({
+        refreshToken: connection.refreshToken,
+        calendarId: connection.calendarId,
+        eventId,
+      });
+    } catch (error) {
+      await this.throwSafeEventError(artistId, error);
+    }
+  }
+
   async status(artistId: string): Promise<CalendarStatusResponse> {
     const connection = await this.prisma.calendarConnection.findUnique({
       where: { artistId },
@@ -366,6 +397,7 @@ export class CalendarService {
       CALENDAR_REAUTH_REQUIRED:
         'La conexión de Google requiere autorización nuevamente',
       CALENDAR_EVENT_EXISTS: 'El evento de Calendar ya existe',
+      CALENDAR_EVENT_NOT_FOUND: 'El evento de Calendar no existe',
       OAUTH_ACCESS_DENIED: 'La autorización de Google fue cancelada',
     };
 
