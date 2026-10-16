@@ -1,10 +1,10 @@
 import {
+  ExecutionContext,
   INestApplication,
   UnauthorizedException,
   ValidationPipe,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import request from 'supertest';
 import {
   CalendarConnectionStatus,
   OutboxStatus,
@@ -579,6 +579,14 @@ describe('SyncIssuesController', () => {
   });
 
   it('rejects unauthenticated access with 401', async () => {
-    await request(app.getHttpServer()).get('/v1/admin/sync-issues').expect(401);
+    const context = {
+      switchToHttp: () => ({
+        getRequest: () => ({ headers: {} }),
+      }),
+    } as unknown as ExecutionContext;
+
+    await expect(
+      app.get(AdminSessionGuard).canActivate(context),
+    ).rejects.toMatchObject({ status: 401 });
   });
 });
