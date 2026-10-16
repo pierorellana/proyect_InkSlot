@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
-import '../../features/admin/presentation/admin_requests_placeholder.dart';
 import '../../features/admin/presentation/admin_shell.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/admin_login_page.dart';
@@ -15,6 +14,8 @@ import '../../features/public_booking/presentation/public_welcome_page.dart';
 import '../../features/requests/data/booking_requests_repository.dart';
 import '../../features/requests/domain/booking_request.dart';
 import '../../features/requests/presentation/booking_requests_controller.dart';
+import '../../features/requests/presentation/booking_request_detail_page.dart';
+import '../../features/requests/presentation/booking_requests_page.dart';
 import '../../features/requests/presentation/link_ready_page.dart';
 import '../../features/requests/presentation/new_booking_request_page.dart';
 
@@ -71,7 +72,10 @@ abstract final class AppRouter {
           routes: [
             GoRoute(
               path: '/admin/requests',
-              builder: (_, _) => const AdminRequestsPlaceholder(),
+              builder: (_, _) => ChangeNotifierProvider.value(
+                value: requests,
+                child: BookingRequestsPage(controller: requests),
+              ),
             ),
             GoRoute(
               path: '/admin/requests/new',
@@ -91,10 +95,12 @@ abstract final class AppRouter {
             ),
             GoRoute(
               path: '/admin/requests/:id',
-              builder: (context, state) => AdminRequestsPlaceholder(
-                title: 'Detalle de solicitud',
-                description:
-                    'El detalle de ${state.pathParameters['id'] ?? 'la solicitud'} estará disponible en el siguiente slice.',
+              builder: (_, state) => ChangeNotifierProvider.value(
+                value: requests,
+                child: BookingRequestDetailPage(
+                  controller: requests,
+                  requestId: state.pathParameters['id'] ?? '',
+                ),
               ),
             ),
           ],

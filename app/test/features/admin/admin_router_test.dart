@@ -4,13 +4,18 @@ import 'package:inkslot_app/core/network/api_client.dart';
 import 'package:inkslot_app/core/network/api_exception.dart';
 import 'package:inkslot_app/core/router/app_router.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
-import 'package:inkslot_app/features/admin/presentation/admin_requests_placeholder.dart';
 import 'package:inkslot_app/features/admin/presentation/admin_shell.dart';
 import 'package:inkslot_app/features/auth/data/auth_repository.dart';
 import 'package:inkslot_app/features/auth/domain/admin_user.dart';
 import 'package:inkslot_app/features/auth/presentation/admin_login_page.dart';
 import 'package:inkslot_app/features/auth/presentation/admin_session_controller.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_welcome_page.dart';
+import 'package:inkslot_app/features/requests/data/booking_requests_repository.dart';
+import 'package:inkslot_app/features/requests/domain/booking_request.dart';
+import 'package:inkslot_app/features/requests/domain/booking_request_status.dart';
+import 'package:inkslot_app/features/requests/presentation/booking_requests_controller.dart';
+import 'package:inkslot_app/features/requests/presentation/booking_request_detail_page.dart';
+import 'package:inkslot_app/features/requests/presentation/booking_requests_page.dart';
 
 void main() {
   testWidgets('redirects signed-out admin deep links to login', (tester) async {
@@ -35,11 +40,14 @@ void main() {
   ) async {
     final session = AdminSessionController(FakeAuthRepository());
     await session.login('artist@example.com', 'password');
+    final requests = EmptyBookingRequestsController();
     final router = AppRouter.create(
       initialLocation: '/admin',
       sessionController: session,
+      bookingRequestsController: requests,
     );
     addTearDown(router.dispose);
+    addTearDown(requests.dispose);
 
     await tester.pumpWidget(
       MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
@@ -51,8 +59,8 @@ void main() {
       '/admin/requests',
     );
     expect(find.byType(AdminShell), findsOneWidget);
-    expect(find.byType(AdminRequestsPlaceholder), findsOneWidget);
-    expect(find.text('Módulo en preparación'), findsOneWidget);
+    expect(find.byType(BookingRequestsPage), findsOneWidget);
+    expect(find.text('Solicitudes'), findsAtLeastNWidgets(1));
   });
 
   testWidgets('keeps public deep links outside the admin guard', (
@@ -75,6 +83,29 @@ void main() {
       router.routerDelegate.currentConfiguration.uri.path,
       '/r/private-token',
     );
+  });
+
+  testWidgets('routes request detail inside the protected admin shell', (
+    tester,
+  ) async {
+    final session = AdminSessionController(FakeAuthRepository());
+    await session.login('artist@example.com', 'password');
+    final requests = EmptyBookingRequestsController();
+    final router = AppRouter.create(
+      initialLocation: '/admin/requests/request-1',
+      sessionController: session,
+      bookingRequestsController: requests,
+    );
+    addTearDown(router.dispose);
+    addTearDown(requests.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp.router(theme: buildInkSlotTheme(), routerConfig: router),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AdminShell), findsOneWidget);
+    expect(find.byType(BookingRequestDetailPage), findsOneWidget);
   });
 
   testWidgets('switches between desktop rail and mobile navigation', (
@@ -106,6 +137,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Salir'), findsOneWidget);
   });
+}
+
+class EmptyBookingRequestsController extends BookingRequestsController {
+  EmptyBookingRequestsController() : super(EmptyBookingRequestsRepository());
+}
+
+class EmptyBookingRequestsRepository extends BookingRequestsRepository {
+  EmptyBookingRequestsRepository() : super(_NoopApiClient());
+
+  @override
+  Future<BookingRequestPage> list({
+    BookingRequestStatus? status,
+    String? cursor,
+  }) async => const BookingRequestPage(items: [], nextCursor: null);
 }
 
 class FakeAuthRepository extends AuthRepository {

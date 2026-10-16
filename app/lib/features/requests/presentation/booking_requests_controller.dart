@@ -105,7 +105,6 @@ class BookingRequestsController extends ChangeNotifier {
   }
 
   Future<void> clearStatusFilter() async {
-    if (_statusFilter == null) return;
     _statusFilter = null;
     await load(refresh: true);
   }

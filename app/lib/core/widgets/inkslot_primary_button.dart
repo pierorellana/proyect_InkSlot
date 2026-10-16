@@ -27,7 +27,7 @@ class InkSlotPrimaryButton extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label),
+          Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
           if (trailing != null) ...[const SizedBox(width: 12), trailing!],
         ],
       ),

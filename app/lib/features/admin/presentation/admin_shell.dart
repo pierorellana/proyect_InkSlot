@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_logo.dart';
@@ -21,17 +22,26 @@ class AdminShell extends StatelessWidget {
     body: LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop = constraints.maxWidth >= 860;
+        final isRequestsRoute = GoRouterState.of(
+          context,
+        ).uri.path.startsWith('/admin/requests');
         return isDesktop
             ? Row(
                 children: [
-                  _AdminRail(sessionController: sessionController),
+                  _AdminRail(
+                    sessionController: sessionController,
+                    requestsSelected: isRequestsRoute,
+                  ),
                   Expanded(child: _AdminContent(child: child)),
                 ],
               )
             : Column(
                 children: [
                   Expanded(child: _AdminContent(child: child)),
-                  _AdminBottomNavigation(sessionController: sessionController),
+                  _AdminBottomNavigation(
+                    sessionController: sessionController,
+                    requestsSelected: isRequestsRoute,
+                  ),
                 ],
               );
       },
@@ -40,9 +50,13 @@ class AdminShell extends StatelessWidget {
 }
 
 class _AdminRail extends StatelessWidget {
-  const _AdminRail({required this.sessionController});
+  const _AdminRail({
+    required this.sessionController,
+    required this.requestsSelected,
+  });
 
   final AdminSessionController sessionController;
+  final bool requestsSelected;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -76,10 +90,11 @@ class _AdminRail extends StatelessWidget {
           const SizedBox(height: 52),
           const InkSlotMonoLabel('Espacio de trabajo'),
           const SizedBox(height: 12),
-          const _AdminNavItem(
+          _AdminNavItem(
             label: 'Solicitudes',
             icon: Icons.inbox_outlined,
-            selected: true,
+            selected: requestsSelected,
+            onTap: () => context.go('/admin/requests'),
           ),
           const Spacer(),
           _UserTile(sessionController: sessionController),
@@ -117,9 +132,13 @@ class _AdminContent extends StatelessWidget {
 }
 
 class _AdminBottomNavigation extends StatelessWidget {
-  const _AdminBottomNavigation({required this.sessionController});
+  const _AdminBottomNavigation({
+    required this.sessionController,
+    required this.requestsSelected,
+  });
 
   final AdminSessionController sessionController;
+  final bool requestsSelected;
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -133,12 +152,13 @@ class _AdminBottomNavigation extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Expanded(
+          Expanded(
             child: _AdminNavItem(
               label: 'Solicitudes',
               icon: Icons.inbox_outlined,
-              selected: true,
+              selected: requestsSelected,
               compact: true,
+              onTap: () => context.go('/admin/requests'),
             ),
           ),
           Expanded(
@@ -158,12 +178,14 @@ class _AdminNavItem extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.selected,
+    required this.onTap,
     this.compact = false,
   });
 
   final String label;
   final IconData icon;
   final bool selected;
+  final VoidCallback onTap;
   final bool compact;
 
   @override
@@ -189,29 +211,36 @@ class _AdminNavItem extends StatelessWidget {
       selected: selected,
       button: true,
       label: label,
-      child: Container(
-        height: compact ? 62 : 48,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14),
-        decoration: BoxDecoration(
-          color: selected ? InkSlotColors.tobacco : Colors.transparent,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(compact ? 18 : 14),
-        ),
-        alignment: Alignment.center,
-        child: DefaultTextStyle(
-          style: TextStyle(
-            color: selected
-                ? InkSlotColors.copperLight
-                : InkSlotColors.secondary,
-            fontSize: compact ? 11 : 14,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-          ),
-          child: IconTheme(
-            data: IconThemeData(
-              color: selected
-                  ? InkSlotColors.copperLight
-                  : InkSlotColors.secondary,
+          child: Container(
+            height: compact ? 62 : 48,
+            padding: EdgeInsets.symmetric(horizontal: compact ? 8 : 14),
+            decoration: BoxDecoration(
+              color: selected ? InkSlotColors.tobacco : Colors.transparent,
+              borderRadius: BorderRadius.circular(compact ? 18 : 14),
             ),
-            child: content,
+            alignment: Alignment.center,
+            child: DefaultTextStyle(
+              style: TextStyle(
+                color: selected
+                    ? InkSlotColors.copperLight
+                    : InkSlotColors.secondary,
+                fontSize: compact ? 11 : 14,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+              ),
+              child: IconTheme(
+                data: IconThemeData(
+                  color: selected
+                      ? InkSlotColors.copperLight
+                      : InkSlotColors.secondary,
+                ),
+                child: content,
+              ),
+            ),
           ),
         ),
       ),
