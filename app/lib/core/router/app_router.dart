@@ -4,7 +4,12 @@ import 'package:provider/provider.dart';
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
 import '../../features/admin/presentation/admin_shell.dart';
+import '../../features/agenda/data/agenda_repository.dart';
+import '../../features/agenda/presentation/admin_agenda_page.dart';
+import '../../features/agenda/presentation/agenda_controller.dart';
 import '../../features/appointments/data/admin_appointments_repository.dart';
+import '../../features/appointments/presentation/admin_appointment_detail_controller.dart';
+import '../../features/appointments/presentation/admin_appointment_detail_page.dart';
 import '../../features/appointments/presentation/admin_appointments_controller.dart';
 import '../../features/appointments/presentation/admin_appointments_page.dart';
 import '../../features/auth/data/auth_repository.dart';
@@ -39,6 +44,8 @@ abstract final class AppRouter {
     BookingRequestsController? bookingRequestsController,
     AdminDashboardController? dashboardController,
     AdminAppointmentsController? appointmentsController,
+    AdminAppointmentDetailController? appointmentDetailController,
+    AgendaController? agendaController,
     SyncIssuesController? syncIssuesController,
     PublicReservationController? publicReservationController,
     ApiClient? apiClient,
@@ -52,6 +59,11 @@ abstract final class AppRouter {
     final appointments =
         appointmentsController ??
         _defaultAppointmentsController(session, apiClient);
+    final appointmentDetail =
+        appointmentDetailController ??
+        _defaultAppointmentDetailController(session, apiClient);
+    final agenda =
+        agendaController ?? _defaultAgendaController(session, apiClient);
     final syncIssues =
         syncIssuesController ??
         _defaultSyncIssuesController(session, apiClient);
@@ -135,7 +147,7 @@ abstract final class AppRouter {
           path: '/admin/login',
           builder: (context, state) => AdminLoginPage(
             sessionController: session,
-            onAuthenticated: () => context.go('/admin/requests'),
+            onAuthenticated: () => context.go('/admin'),
           ),
         ),
         ShellRoute(
@@ -146,7 +158,11 @@ abstract final class AppRouter {
               path: '/admin',
               builder: (_, _) => ChangeNotifierProvider.value(
                 value: dashboard,
-                child: AdminDashboardPage(controller: dashboard),
+                child: AdminDashboardPage(
+                  controller: dashboard,
+                  sessionController: session,
+                  requestsController: requests,
+                ),
               ),
             ),
             GoRoute(
@@ -166,11 +182,21 @@ abstract final class AppRouter {
             GoRoute(
               path: '/admin/requests/link',
               redirect: (_, state) =>
-                  state.extra is LinkReadyData ? null : '/admin/requests',
-              builder: (context, state) => LinkReadyPage(
-                link: state.extra! as LinkReadyData,
-                onBack: () => context.go('/admin/requests'),
-              ),
+                  state.extra is LinkReadyData || state.extra is LinkReadyArgs
+                  ? null
+                  : '/admin/requests',
+              builder: (context, state) {
+                final extra = state.extra;
+                final args = extra is LinkReadyArgs
+                    ? extra
+                    : LinkReadyArgs(link: extra! as LinkReadyData);
+                return LinkReadyPage(
+                  link: args.link,
+                  clientName: args.clientName,
+                  durationMinutes: args.durationMinutes,
+                  onBack: () => context.go('/admin'),
+                );
+              },
             ),
             GoRoute(
               path: '/admin/requests/:id',
@@ -188,6 +214,18 @@ abstract final class AppRouter {
                 value: appointments,
                 child: AdminAppointmentsPage(controller: appointments),
               ),
+            ),
+            GoRoute(
+              path: '/admin/appointments/:id',
+              builder: (_, state) => AdminAppointmentDetailPage(
+                controller: appointmentDetail,
+                appointmentId: state.pathParameters['id'] ?? '',
+                onChanged: () => appointments.load(refresh: true),
+              ),
+            ),
+            GoRoute(
+              path: '/admin/agenda',
+              builder: (_, _) => AdminAgendaPage(controller: agenda),
             ),
             GoRoute(
               path: '/admin/sync-issues',
@@ -213,7 +251,7 @@ abstract final class AppRouter {
     final isLoginRoute = path == '/admin/login';
     return switch (session.status) {
       AdminSessionStatus.checking => null,
-      AdminSessionStatus.signedIn => isLoginRoute ? '/admin/requests' : null,
+      AdminSessionStatus.signedIn => isLoginRoute ? '/admin' : null,
       AdminSessionStatus.signedOut ||
       AdminSessionStatus.failure => isLoginRoute ? null : '/admin/login',
     };
@@ -249,6 +287,22 @@ abstract final class AppRouter {
     ApiClient? apiClient,
   ) => AdminAppointmentsController(
     AdminAppointmentsRepository(apiClient ?? _UnavailableApiClient()),
+    sessionController: session,
+  );
+
+  static AdminAppointmentDetailController _defaultAppointmentDetailController(
+    AdminSessionController session,
+    ApiClient? apiClient,
+  ) => AdminAppointmentDetailController(
+    AdminAppointmentsRepository(apiClient ?? _UnavailableApiClient()),
+    sessionController: session,
+  );
+
+  static AgendaController _defaultAgendaController(
+    AdminSessionController session,
+    ApiClient? apiClient,
+  ) => AgendaController(
+    AgendaRepository(apiClient ?? _UnavailableApiClient()),
     sessionController: session,
   );
 

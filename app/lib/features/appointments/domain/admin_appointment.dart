@@ -85,6 +85,78 @@ class AdminAppointment {
   }
 }
 
+class AdminAppointmentClient {
+  const AdminAppointmentClient({
+    required this.name,
+    this.email,
+    this.phone,
+    this.contactChannel,
+    this.contactValue,
+  });
+
+  final String name;
+  final String? email;
+  final String? phone;
+  final String? contactChannel;
+  final String? contactValue;
+
+  String get contactLabel => contactValue ?? email ?? phone ?? 'No registrado';
+
+  factory AdminAppointmentClient.fromJson(Map<String, dynamic> json) =>
+      AdminAppointmentClient(
+        name: _requiredString(json, 'name'),
+        email: _optionalString(json, 'email'),
+        phone: _optionalString(json, 'phone'),
+        contactChannel: _optionalString(json, 'contactChannel'),
+        contactValue: _optionalString(json, 'contactValue'),
+      );
+}
+
+class AdminAppointmentDetail {
+  const AdminAppointmentDetail({
+    required this.id,
+    required this.client,
+    required this.startAt,
+    required this.endAt,
+    required this.durationMinutes,
+    required this.status,
+    required this.syncStatus,
+    required this.version,
+    this.lastSyncedAt,
+  });
+
+  final String id;
+  final AdminAppointmentClient client;
+  final DateTime startAt;
+  final DateTime endAt;
+  final int durationMinutes;
+  final AdminAppointmentStatus status;
+  final AdminAppointmentSyncStatus syncStatus;
+  final int version;
+  final DateTime? lastSyncedAt;
+
+  bool get isActive => status == AdminAppointmentStatus.confirmed;
+
+  factory AdminAppointmentDetail.fromJson(Map<String, dynamic> json) {
+    final event = json['calendarEvent'];
+    DateTime? lastSyncedAt;
+    if (event is Map && event['lastSyncedAt'] is String) {
+      lastSyncedAt = DateTime.tryParse(event['lastSyncedAt'] as String);
+    }
+    return AdminAppointmentDetail(
+      id: _requiredString(json, 'id'),
+      client: AdminAppointmentClient.fromJson(_requiredMap(json, 'client')),
+      startAt: _requiredDate(json, 'startAt'),
+      endAt: _requiredDate(json, 'endAt'),
+      durationMinutes: _requiredInt(json, 'durationMinutes'),
+      status: AdminAppointmentStatus.fromApi(json['status']),
+      syncStatus: AdminAppointmentSyncStatus.fromApi(json['syncStatus']),
+      version: _requiredInt(json, 'version'),
+      lastSyncedAt: lastSyncedAt,
+    );
+  }
+}
+
 class AdminAppointmentPage {
   const AdminAppointmentPage({required this.items, required this.nextCursor});
 
@@ -122,6 +194,11 @@ String _requiredString(Map<String, dynamic> json, String key) {
   final value = json[key];
   if (value is String && value.isNotEmpty) return value;
   throw FormatException('El campo "$key" no tiene un texto válido.');
+}
+
+String? _optionalString(Map<String, dynamic> json, String key) {
+  final value = json[key];
+  return value is String && value.isNotEmpty ? value : null;
 }
 
 String? _nullableString(Map<String, dynamic> json, String key) {
