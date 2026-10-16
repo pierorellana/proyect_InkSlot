@@ -27,6 +27,15 @@ const BOOKING_STATUSES = [
   'closed',
 ] as const;
 
+export const CONTACT_CHANNELS = [
+  'whatsapp',
+  'instagram',
+  'email',
+  'phone',
+] as const;
+
+export type ContactChannel = (typeof CONTACT_CHANNELS)[number];
+
 export type BookingRequestStatusFilter = (typeof BOOKING_STATUSES)[number];
 
 export class InlineClientDto {
@@ -69,6 +78,22 @@ export class CreateBookingRequestDto {
 
   @IsBoolean()
   depositVerified!: boolean;
+
+  @IsOptional()
+  @IsIn(CONTACT_CHANNELS)
+  contactChannel?: ContactChannel;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(320)
+  contactValue?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(160)
+  paymentReference?: string;
 
   @IsInt()
   @Min(1)

@@ -72,6 +72,7 @@ describe('BookingRequestsService public resolution', () => {
       id: requestId,
       artistId,
       clientId: '44444444-4444-4444-8444-444444444444',
+      paymentReference: 'private-payment-reference',
       depositVerifiedAt: now,
       depositVerifiedBy: artistId,
       durationMinutes: 180,
@@ -165,6 +166,9 @@ describe('BookingRequestsService public resolution', () => {
       rawToken,
       'depositVerifiedAt',
       'notes',
+      'private-payment-reference',
+      'instagram',
+      '@private-client',
     ]) {
       expect(serialized).not.toContain(privateValue);
     }

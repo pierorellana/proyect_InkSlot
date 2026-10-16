@@ -8,6 +8,7 @@ import {
   ServiceUnavailableException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { isEmail } from 'class-validator';
 import { BookingRequestStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../database/prisma.service';
@@ -16,6 +17,7 @@ import {
   DEFAULT_BOOKING_TOKEN_TTL_HOURS,
   MAX_BOOKING_TOKEN_TTL_HOURS,
 } from './requests.constants';
+import { CONTACT_CHANNELS } from './requests.dto';
 import {
   decodeBookingCursor,
   encodeBookingCursor,
@@ -25,6 +27,7 @@ import {
 import type {
   BookingRequestStatusFilter,
   CreateBookingRequestDto,
+  ContactChannel,
   ListBookingRequestsDto,
   RenewBookingTokenDto,
 } from './requests.dto';
@@ -61,6 +64,11 @@ type NormalizedRestrictions = {
   allowedWindows: Array<{ startLocal: string; endLocal: string }> | null;
 };
 
+type NormalizedContact = {
+  channel: ContactChannel;
+  value: string;
+};
+
 export type BookingRequestResponse = {
   id: string;
   client: {
@@ -68,7 +76,10 @@ export type BookingRequestResponse = {
     name: string;
     email: string | null;
     phone: string | null;
+    contactChannel: ContactChannel | null;
+    contactValue: string | null;
   };
+  paymentReference: string | null;
   depositVerified: boolean;
   durationMinutes: number;
   status: Lowercase<BookingRequestStatus>;
@@ -140,6 +151,10 @@ export class BookingRequestsService {
     const restrictions = this.normalizeRestrictions(dto);
     const ttlHours = this.validateTtl(dto.tokenTtlHours);
     this.validateClientSource(dto);
+    const contact = this.normalizeContact(dto);
+    const paymentReference = this.normalizePaymentReference(
+      dto.paymentReference,
+    );
 
     if (dto.depositVerified !== true) {
       throw new UnprocessableEntityException(
@@ -154,7 +169,7 @@ export class BookingRequestsService {
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
     return this.serializable(async (transaction) => {
-      const client = dto.clientId
+      let client = dto.clientId
         ? await transaction.client.findFirst({
             where: { id: dto.clientId, artistId },
           })
@@ -162,17 +177,29 @@ export class BookingRequestsService {
             data: {
               artistId,
               name: dto.client!.name.trim(),
-              email: dto.client!.email?.trim() || null,
-              phone: dto.client!.phone?.trim() || null,
+              ...this.clientContactData(dto.client, contact),
             },
           });
 
       if (!client) throw notFound();
 
+      if (dto.clientId && contact) {
+        const updated = await transaction.client.updateMany({
+          where: { id: client.id, artistId },
+          data: this.clientContactData(undefined, contact),
+        });
+        if (updated.count !== 1) throw notFound();
+        client = {
+          ...client,
+          ...this.clientContactData(undefined, contact),
+        };
+      }
+
       const request = await transaction.bookingRequest.create({
         data: {
           artistId,
           clientId: client.id,
+          paymentReference,
           depositVerifiedAt: new Date(),
           depositVerifiedBy: artistId,
           durationMinutes: dto.durationMinutes,
@@ -612,6 +639,88 @@ export class BookingRequestsService {
     }
   }
 
+  private normalizeContact(
+    dto: CreateBookingRequestDto,
+  ): NormalizedContact | null {
+    const hasChannel = dto.contactChannel !== undefined;
+    const hasValue = dto.contactValue !== undefined;
+    if (hasChannel !== hasValue) {
+      throw badRequest(
+        'INVALID_CONTACT',
+        'El canal y el valor de contacto deben enviarse juntos',
+      );
+    }
+    if (!hasChannel || !hasValue) return null;
+
+    const channel = dto.contactChannel;
+    const value = dto.contactValue?.trim() ?? '';
+    if (!channel || !CONTACT_CHANNELS.includes(channel) || !value) {
+      throw badRequest('INVALID_CONTACT', 'El contacto no puede estar vacío');
+    }
+    if (channel === 'email' && !isEmail(value)) {
+      throw badRequest('INVALID_CONTACT', 'El email de contacto no es válido');
+    }
+    if ((channel === 'whatsapp' || channel === 'phone') && value.length > 32) {
+      throw badRequest(
+        'INVALID_CONTACT',
+        'El teléfono de contacto no puede superar 32 caracteres',
+      );
+    }
+    if (channel === 'instagram' && value.length > 64) {
+      throw badRequest(
+        'INVALID_CONTACT',
+        'El usuario de Instagram no puede superar 64 caracteres',
+      );
+    }
+    return { channel, value };
+  }
+
+  private normalizePaymentReference(value: string | undefined): string | null {
+    if (value === undefined) return null;
+    const normalized = value.trim();
+    if (!normalized) {
+      throw badRequest(
+        'INVALID_PAYMENT_REFERENCE',
+        'La referencia del anticipo no puede estar vacía',
+      );
+    }
+    if (normalized.length > 160) {
+      throw badRequest(
+        'INVALID_PAYMENT_REFERENCE',
+        'La referencia del anticipo no puede superar 160 caracteres',
+      );
+    }
+    return normalized;
+  }
+
+  private clientContactData(
+    client: CreateBookingRequestDto['client'],
+    contact: NormalizedContact | null,
+  ): {
+    email: string | null;
+    phone: string | null;
+    contactChannel: string | null;
+    contactValue: string | null;
+  } {
+    if (!contact) {
+      return {
+        email: client?.email?.trim() || null,
+        phone: client?.phone?.trim() || null,
+        contactChannel: null,
+        contactValue: null,
+      };
+    }
+    return {
+      email: contact.channel === 'email' ? contact.value : null,
+      phone:
+        contact.channel === 'whatsapp' || contact.channel === 'phone'
+          ? contact.value
+          : null,
+      contactChannel: contact.channel,
+      contactValue: contact.value,
+    };
+  }
+
   private validateTtl(value: number | undefined): number {
     const ttl = value === undefined ? DEFAULT_BOOKING_TOKEN_TTL_HOURS : value;
     if (
@@ -741,7 +850,10 @@ export class BookingRequestsService {
         name: request.client.name,
         email: request.client.email,
         phone: request.client.phone,
+        contactChannel: request.client.contactChannel as ContactChannel | null,
+        contactValue: request.client.contactValue,
       },
+      paymentReference: request.paymentReference,
       depositVerified: request.depositVerifiedAt !== null,
       durationMinutes: request.durationMinutes,
       status: request.status.toLowerCase() as Lowercase<BookingRequestStatus>,

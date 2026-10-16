@@ -118,6 +118,8 @@ model Client {
   name            String           @db.VarChar(120)
   email           String?          @db.VarChar(320)
   phone           String?          @db.VarChar(32)
+  contactChannel  String?          @map("contact_channel") @db.VarChar(32)
+  contactValue    String?          @map("contact_value") @db.VarChar(320)
   createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   artist          Artist           @relation(fields: [artistId], references: [id], onDelete: Restrict)
   bookingRequests BookingRequest[]
@@ -130,6 +132,7 @@ model BookingRequest {
   id                String               @id @default(uuid()) @db.Uuid
   artistId          String               @map("artist_id") @db.Uuid
   clientId          String               @map("client_id") @db.Uuid
+  paymentReference  String?              @map("payment_reference") @db.VarChar(160)
   depositVerifiedAt DateTime?            @map("deposit_verified_at") @db.Timestamptz(6)
   depositVerifiedBy String?              @map("deposit_verified_by") @db.Uuid
   durationMinutes   Int                  @map("duration_minutes")

@@ -21,6 +21,8 @@ describe('BookingRequestsService administration', () => {
     name: 'Cliente',
     email: null,
     phone: '+593000000000',
+    contactChannel: null,
+    contactValue: null,
     createdAt: now,
   };
   const rawToken = 'unit-test-opaque-secret';
@@ -29,6 +31,10 @@ describe('BookingRequestsService administration', () => {
   const tx = {
     client: {
       create: jest.fn<Promise<Client>, [Prisma.ClientCreateArgs]>(),
+      updateMany: jest.fn<
+        Promise<Prisma.BatchPayload>,
+        [Prisma.ClientUpdateManyArgs]
+      >(),
       findFirst: jest.fn<
         Promise<Client | null>,
         [Prisma.ClientFindFirstArgs]
@@ -88,6 +94,7 @@ describe('BookingRequestsService administration', () => {
       client,
       depositVerifiedAt: now,
       depositVerifiedBy: artistId,
+      paymentReference: null,
       durationMinutes: 180,
       status: BookingRequestStatus.PENDING,
       minDate: null,
@@ -109,6 +116,7 @@ describe('BookingRequestsService administration', () => {
       ],
     };
     tx.client.create.mockResolvedValue(client);
+    tx.client.updateMany.mockResolvedValue({ count: 1 });
     tx.client.findFirst.mockResolvedValue(client);
     tx.bookingRequest.create.mockImplementation(() => Promise.resolve(row));
     tx.bookingRequest.findFirst.mockImplementation(() => Promise.resolve(row));
@@ -168,7 +176,14 @@ describe('BookingRequestsService administration', () => {
       isolationLevel: 'Serializable',
     });
     expect(tx.client.create).toHaveBeenCalledWith({
-      data: { artistId, name: 'Cliente', email: null, phone: client.phone },
+      data: {
+        artistId,
+        name: 'Cliente',
+        email: null,
+        phone: client.phone,
+        contactChannel: null,
+        contactValue: null,
+      },
     });
     const requestCreate = tx.bookingRequest.create.mock.calls[0]?.[0];
     expect(requestCreate?.data.artistId).toBe(artistId);
@@ -176,6 +191,7 @@ describe('BookingRequestsService administration', () => {
     expect(requestCreate?.data.depositVerifiedBy).toBe(artistId);
     expect(requestCreate?.data.depositVerifiedAt).toEqual(now);
     expect(requestCreate?.data.status).toBe('PENDING');
+    expect(requestCreate?.data.paymentReference).toBeNull();
     expect(tx.bookingToken.create).toHaveBeenCalledWith({
       data: {
         requestId: id,
@@ -201,7 +217,10 @@ describe('BookingRequestsService administration', () => {
       name: client.name,
       email: null,
       phone: client.phone,
+      contactChannel: null,
+      contactValue: null,
     });
+    expect(result.request.paymentReference).toBeNull();
     const writes = JSON.stringify([
       tx.client.create.mock.calls,
       tx.bookingRequest.create.mock.calls,
@@ -224,6 +243,122 @@ describe('BookingRequestsService administration', () => {
       where: { id: client.id, artistId },
     });
     expect(tx.client.create).not.toHaveBeenCalled();
+  });
+
+  it('persists contact metadata and payment reference with normalized legacy fields', async () => {
+    row.client = {
+      ...client,
+      email: null,
+      phone: null,
+      contactChannel: 'instagram',
+      contactValue: '@inkslot',
+    };
+    row.paymentReference = 'TRX-123';
+
+    const result = await service.create(artistId, {
+      ...input(),
+      client: {
+        name: 'Cliente',
+        email: 'legacy@example.test',
+        phone: '+593111111111',
+      },
+      contactChannel: 'instagram',
+      contactValue: '  @inkslot  ',
+      paymentReference: '  TRX-123  ',
+    });
+
+    expect(tx.client.create).toHaveBeenCalledWith({
+      data: {
+        artistId,
+        name: 'Cliente',
+        email: null,
+        phone: null,
+        contactChannel: 'instagram',
+        contactValue: '@inkslot',
+      },
+    });
+    expect(tx.bookingRequest.create.mock.calls[0]?.[0].data).toEqual(
+      expect.objectContaining({ paymentReference: 'TRX-123' }),
+    );
+    expect(result.request.client).toEqual({
+      id: client.id,
+      name: client.name,
+      email: null,
+      phone: null,
+      contactChannel: 'instagram',
+      contactValue: '@inkslot',
+    });
+    expect(result.request.paymentReference).toBe('TRX-123');
+  });
+
+  it.each([
+    ['email', 'contact@example.test', 'contact@example.test', null],
+    ['whatsapp', '+593999999999', null, '+593999999999'],
+    ['phone', '+593888888888', null, '+593888888888'],
+  ] as const)(
+    'maps %s contact data to legacy fields',
+    async (channel, value, email, phone) => {
+      await service.create(artistId, {
+        ...input(),
+        contactChannel: channel,
+        contactValue: value,
+      });
+
+      expect(tx.client.create.mock.calls[0]?.[0].data).toEqual(
+        expect.objectContaining({
+          email,
+          phone,
+          contactChannel: channel,
+          contactValue: value,
+        }),
+      );
+    },
+  );
+
+  it.each([
+    [{ contactChannel: 'email' }, 'INVALID_CONTACT'],
+    [{ contactValue: 'contact@example.test' }, 'INVALID_CONTACT'],
+    [
+      { contactChannel: 'email', contactValue: 'not-an-email' },
+      'INVALID_CONTACT',
+    ],
+    [
+      { contactChannel: 'phone', contactValue: '1'.repeat(33) },
+      'INVALID_CONTACT',
+    ],
+    [
+      { contactChannel: 'instagram', contactValue: '1'.repeat(65) },
+      'INVALID_CONTACT',
+    ],
+    [{ paymentReference: '   ' }, 'INVALID_PAYMENT_REFERENCE'],
+    [{ paymentReference: '1'.repeat(161) }, 'INVALID_PAYMENT_REFERENCE'],
+  ] as const)('rejects invalid contact metadata %j', async (metadata, code) => {
+    await expectCode(
+      service.create(artistId, { ...input(), ...metadata }),
+      code,
+      400,
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('updates an existing scoped client only when contact metadata is explicit', async () => {
+    await service.create(artistId, {
+      clientId: client.id,
+      contactChannel: 'email',
+      contactValue: 'updated@example.test',
+      depositVerified: true,
+      durationMinutes: 60,
+    });
+
+    expect(tx.client.updateMany).toHaveBeenCalledWith({
+      where: { id: client.id, artistId },
+      data: {
+        email: 'updated@example.test',
+        phone: null,
+        contactChannel: 'email',
+        contactValue: 'updated@example.test',
+      },
+    });
   });
 
   it('hides clients from another artist', async () => {

@@ -16,7 +16,10 @@ type CreateResponse = {
       name: string;
       email: string | null;
       phone: string | null;
+      contactChannel: string | null;
+      contactValue: string | null;
     };
+    paymentReference: string | null;
     status: string;
   };
   link: { path: string; expiresAt: string };
@@ -233,6 +236,47 @@ describe('booking request lifecycle', () => {
     expect(persisted.tokenHash).toBe(hashBookingToken(token));
     expect(persisted.tokenHash).not.toBe(token);
     expect(JSON.stringify(persisted)).not.toContain(token);
+  });
+
+  it('persists contact metadata and payment reference without exposing them publicly', async () => {
+    const created = await createInline(cookies, {
+      contactChannel: 'instagram',
+      contactValue: '@inkslot.test',
+      paymentReference: 'TRX-2026-001',
+    });
+    const persistedClient = await prisma.client.findUniqueOrThrow({
+      where: { id: created.response.request.client.id },
+    });
+    const persistedRequest = await prisma.bookingRequest.findUniqueOrThrow({
+      where: { id: created.response.request.id },
+    });
+
+    expect(created.response.request).toMatchObject({
+      client: {
+        contactChannel: 'instagram',
+        contactValue: '@inkslot.test',
+        email: null,
+        phone: null,
+      },
+      paymentReference: 'TRX-2026-001',
+    });
+    expect(persistedClient).toMatchObject({
+      contactChannel: 'instagram',
+      contactValue: '@inkslot.test',
+      email: null,
+      phone: null,
+    });
+    expect(persistedRequest.paymentReference).toBe('TRX-2026-001');
+
+    const publicResponse = await request(app.getHttpServer())
+      .get(`/v1/public/reservations/${created.token}`)
+      .expect(200);
+    expect(JSON.stringify(publicResponse.body)).not.toContain('@inkslot.test');
+    expect(JSON.stringify(publicResponse.body)).not.toContain('TRX-2026-001');
+    expect(JSON.stringify(publicResponse.body)).not.toContain('contactChannel');
+    expect(JSON.stringify(publicResponse.body)).not.toContain(
+      'paymentReference',
+    );
   });
 
   it('creates a request for an existing scoped client and rejects a foreign client', async () => {
