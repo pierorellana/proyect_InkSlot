@@ -16,7 +16,24 @@ abstract class ApiClient {
   });
 }
 
-class HttpApiClient implements ApiClient {
+/// Verbos adicionales del API de administración (PUT, PATCH, DELETE y listas).
+abstract class RestApiClient implements ApiClient {
+  Future<List<dynamic>> getJsonList(String path);
+
+  Future<Map<String, dynamic>> putJson(
+    String path, {
+    Map<String, dynamic>? body,
+  });
+
+  Future<Map<String, dynamic>> patchJson(
+    String path, {
+    Map<String, dynamic>? body,
+  });
+
+  Future<void> deleteJson(String path);
+}
+
+class HttpApiClient implements RestApiClient {
   HttpApiClient({http.Client? client, Uri? baseUri})
     : _client = client ?? createHttpClient(),
       _baseUri = baseUri ?? AppConfig.apiBaseUri;
@@ -35,9 +52,55 @@ class HttpApiClient implements ApiClient {
     Map<String, String>? headers,
   }) => _request(method: 'POST', path: path, body: body, headers: headers);
 
+  @override
+  Future<List<dynamic>> getJsonList(String path) async {
+    final decoded = await _send(method: 'GET', path: path);
+    if (decoded is List) return decoded;
+    throw const ApiException(
+      code: 'INVALID_RESPONSE',
+      message: 'El servidor devolvió una respuesta inválida.',
+    );
+  }
+
+  @override
+  Future<Map<String, dynamic>> putJson(
+    String path, {
+    Map<String, dynamic>? body,
+  }) => _request(method: 'PUT', path: path, body: body);
+
+  @override
+  Future<Map<String, dynamic>> patchJson(
+    String path, {
+    Map<String, dynamic>? body,
+  }) => _request(method: 'PATCH', path: path, body: body);
+
+  @override
+  Future<void> deleteJson(String path) async {
+    await _send(method: 'DELETE', path: path);
+  }
+
   void close() => _client.close();
 
   Future<Map<String, dynamic>> _request({
+    required String method,
+    required String path,
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    final decoded = await _send(
+      method: method,
+      path: path,
+      body: body,
+      headers: headers,
+    );
+    if (decoded is Map<String, dynamic>) return decoded;
+    throw const ApiException(
+      code: 'INVALID_RESPONSE',
+      message: 'El servidor devolvió una respuesta inválida.',
+    );
+  }
+
+  Future<Object> _send({
     required String method,
     required String path,
     Map<String, dynamic>? body,
@@ -70,7 +133,10 @@ class HttpApiClient implements ApiClient {
 
     final decoded = _decode(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw _toApiException(response.statusCode, decoded);
+      throw _toApiException(
+        response.statusCode,
+        decoded is Map<String, dynamic> ? decoded : <String, dynamic>{},
+      );
     }
 
     return decoded;
@@ -83,7 +149,7 @@ class HttpApiClient implements ApiClient {
     return _baseUri.replace(path: '$basePath/$requestPath');
   }
 
-  Map<String, dynamic> _decode(String body) {
+  Object _decode(String body) {
     if (body.trim().isEmpty) return <String, dynamic>{};
 
     final dynamic decoded;
@@ -99,6 +165,7 @@ class HttpApiClient implements ApiClient {
     if (decoded is Map) {
       return Map<String, dynamic>.from(decoded);
     }
+    if (decoded is List) return decoded;
 
     throw const ApiException(
       code: 'INVALID_RESPONSE',

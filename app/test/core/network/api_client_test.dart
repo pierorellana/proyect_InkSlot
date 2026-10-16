@@ -127,6 +127,36 @@ void main() {
       ),
     );
   });
+
+  test('supports lists, PUT, PATCH and DELETE', () async {
+    final methods = <String>[];
+    final client = RecordingHttpClient((request) async {
+      methods.add(request.method);
+      if (request.method == 'DELETE') return http.Response('', 204);
+      if (request.method == 'GET') return http.Response('[{"id":"b1"}]', 200);
+      return http.Response('{"ok":true}', 200);
+    });
+    final api = HttpApiClient(
+      client: client,
+      baseUri: Uri.parse('http://localhost:3000/v1'),
+    );
+
+    expect(await api.getJsonList('/admin/blocks'), [
+      {'id': 'b1'},
+    ]);
+    expect(await api.putJson('/admin/availability', body: {'a': 1}), {
+      'ok': true,
+    });
+    expect(await api.patchJson('/admin/appointments/1/reschedule'), {
+      'ok': true,
+    });
+    await api.deleteJson('/admin/blocks/b1');
+    expect(methods, ['GET', 'PUT', 'PATCH', 'DELETE']);
+    await expectLater(
+      api.getJson('/admin/blocks'),
+      throwsA(isA<ApiException>()),
+    );
+  });
 }
 
 class RecordingHttpClient extends http.BaseClient {
