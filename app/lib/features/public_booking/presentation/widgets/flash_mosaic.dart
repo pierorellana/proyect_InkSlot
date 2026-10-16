@@ -69,9 +69,9 @@ class _FlashMosaicState extends State<FlashMosaic>
         child: Stack(
           children: [
             Positioned(
-              left: -14,
-              right: -14,
-              top: -150,
+              left: 0,
+              right: 0,
+              top: -90,
               height:
                   _tilesPerColumn * _tileHeight +
                   (_tilesPerColumn - 1) * _tileGap,
@@ -80,41 +80,47 @@ class _FlashMosaicState extends State<FlashMosaic>
                   final availableWidth = constraints.maxWidth.isFinite
                       ? constraints.maxWidth
                       : 418.0;
-                  final mosaicWidth = math.min(availableWidth, 620.0);
+                  final mosaicWidth = math.max(540.0, availableWidth + 150);
 
-                  return Align(
+                  return OverflowBox(
                     alignment: Alignment.topCenter,
+                    minWidth: mosaicWidth,
+                    maxWidth: mosaicWidth,
                     child: SizedBox(
                       width: mosaicWidth,
-                      child: Transform.rotate(
-                        angle: -13 * math.pi / 180,
-                        child: Row(
-                          key: const ValueKey('flash-mosaic-columns'),
-                          children: [
-                            Expanded(
-                              child: _MosaicColumn(
-                                animation: _up,
-                                offset: 0,
-                                reverse: false,
+                      child: Transform.translate(
+                        offset: const Offset(-70, 0),
+                        child: Transform.rotate(
+                          angle: -13 * math.pi / 180,
+                          alignment: Alignment.topCenter,
+                          child: Row(
+                            key: const ValueKey('flash-mosaic-columns'),
+                            children: [
+                              Expanded(
+                                child: _MosaicColumn(
+                                  animation: _up,
+                                  offset: 0,
+                                  reverse: false,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: _tileGap),
-                            Expanded(
-                              child: _MosaicColumn(
-                                animation: _down,
-                                offset: 2,
-                                reverse: true,
+                              const SizedBox(width: _tileGap),
+                              Expanded(
+                                child: _MosaicColumn(
+                                  animation: _down,
+                                  offset: 2,
+                                  reverse: true,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: _tileGap),
-                            Expanded(
-                              child: _MosaicColumn(
-                                animation: _up,
-                                offset: 4,
-                                reverse: false,
+                              const SizedBox(width: _tileGap),
+                              Expanded(
+                                child: _MosaicColumn(
+                                  animation: _up,
+                                  offset: 4,
+                                  reverse: false,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),

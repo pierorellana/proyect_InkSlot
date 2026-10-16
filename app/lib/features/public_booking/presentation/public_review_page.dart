@@ -470,7 +470,7 @@ class _ReviewTicketState extends State<_ReviewTicket>
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'DODOGIO STUDIO',
+                            'DODOGIO',
                             style: inkSlotMono(
                               size: 10,
                               color: InkSlotColors.ash,
@@ -545,7 +545,7 @@ class _ReviewTicketState extends State<_ReviewTicket>
                           ),
                           const SizedBox(width: 14),
                           const Expanded(
-                            child: _TicketField('Estudio', 'Dodogio Studio'),
+                            child: _TicketField('Estudio', 'Dodogio'),
                           ),
                         ],
                       ),

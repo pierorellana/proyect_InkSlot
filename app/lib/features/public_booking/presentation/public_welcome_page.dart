@@ -291,7 +291,7 @@ class _ActiveBlock extends StatelessWidget {
         InkSlotRise.step(
           3,
           child: _ArtistRow(
-            name: '${reservation.artistDisplayName} · Dodogio Studio',
+            name: reservation.artistDisplayName,
             subtitle:
                 'Hasta el ${expiry.day} ${expiry.monthShort} · '
                 '${publicZoneDescription(reservation.timezone).split(' (').first}',
@@ -574,7 +574,7 @@ class _BookedTicket extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Sesión de ${publicDurationShort(minutes)} · Dodogio Studio',
+                  'Sesión de ${publicDurationShort(minutes)} · Dodogio',
                   style: const TextStyle(
                     color: InkSlotColors.ash,
                     fontSize: 13,
