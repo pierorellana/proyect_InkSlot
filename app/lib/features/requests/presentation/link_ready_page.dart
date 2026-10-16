@@ -52,7 +52,10 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
     final base = Uri.base;
     final hasWebOrigin = base.scheme == 'http' || base.scheme == 'https';
     final origin = hasWebOrigin ? base.origin : 'http://localhost';
-    return '$origin${widget.link.path}';
+    // Flutter Web uses hash-based navigation in this build. Without the hash,
+    // opening a generated link loads `/`, whose local demo redirect points to
+    // the fixed `demo-token` fixture instead of this request's token.
+    return '$origin/#${widget.link.path}';
   }
 
   String get _displayUrl => _url.replaceFirst(RegExp(r'^https?://'), '');

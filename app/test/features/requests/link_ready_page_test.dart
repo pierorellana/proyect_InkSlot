@@ -63,6 +63,10 @@ void main() {
     expect(find.text('Copiado'), findsOneWidget);
     expect(find.text('Enlace copiado'), findsOneWidget);
     expect(copied, hasLength(1));
+    expect(
+      (copied.single as Map<Object?, Object?>)['text'],
+      endsWith('/#/r/secret-token'),
+    );
 
     await tester.tap(find.text('Compartir'));
     await tester.pumpAndSettle();
