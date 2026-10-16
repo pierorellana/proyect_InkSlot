@@ -12,13 +12,21 @@ import '../../features/public_booking/presentation/public_dates_placeholder.dart
 import '../../features/public_booking/presentation/public_entry_controller.dart';
 import '../../features/public_booking/presentation/public_splash_page.dart';
 import '../../features/public_booking/presentation/public_welcome_page.dart';
+import '../../features/requests/data/booking_requests_repository.dart';
+import '../../features/requests/domain/booking_request.dart';
+import '../../features/requests/presentation/booking_requests_controller.dart';
+import '../../features/requests/presentation/link_ready_page.dart';
+import '../../features/requests/presentation/new_booking_request_page.dart';
 
 abstract final class AppRouter {
   static GoRouter create({
     String initialLocation = '/',
     AdminSessionController? sessionController,
+    BookingRequestsController? bookingRequestsController,
   }) {
     final session = sessionController ?? _defaultSessionController();
+    final requests =
+        bookingRequestsController ?? _defaultBookingRequestsController(session);
 
     return GoRouter(
       initialLocation: initialLocation,
@@ -67,18 +75,18 @@ abstract final class AppRouter {
             ),
             GoRoute(
               path: '/admin/requests/new',
-              builder: (_, _) => const AdminRequestsPlaceholder(
-                title: 'Nueva solicitud',
-                description:
-                    'El formulario de solicitud estará disponible en el siguiente slice.',
+              builder: (context, state) => ChangeNotifierProvider.value(
+                value: requests,
+                child: NewBookingRequestPage(controller: requests),
               ),
             ),
             GoRoute(
               path: '/admin/requests/link',
-              builder: (_, _) => const AdminRequestsPlaceholder(
-                title: 'Enlace listo',
-                description:
-                    'La entrega segura del enlace estará disponible en el siguiente slice.',
+              redirect: (_, state) =>
+                  state.extra is LinkReadyData ? null : '/admin/requests',
+              builder: (context, state) => LinkReadyPage(
+                link: state.extra! as LinkReadyData,
+                onBack: () => context.go('/admin/requests'),
               ),
             ),
             GoRoute(
@@ -114,6 +122,13 @@ abstract final class AppRouter {
 
   static AdminSessionController _defaultSessionController() =>
       AdminSessionController(AuthRepository(_UnavailableApiClient()));
+
+  static BookingRequestsController _defaultBookingRequestsController(
+    AdminSessionController session,
+  ) => BookingRequestsController(
+    BookingRequestsRepository(HttpApiClient()),
+    sessionController: session,
+  );
 }
 
 class _UnavailableApiClient implements ApiClient {
