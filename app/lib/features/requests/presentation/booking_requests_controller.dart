@@ -8,6 +8,8 @@ import '../domain/booking_request_status.dart';
 
 enum BookingRequestsListStatus { idle, loading, ready, empty, error }
 
+enum BookingRequestsFilter { pending, booked, expired, cancelled }
+
 enum BookingRequestDetailStatus { idle, loading, ready, error }
 
 enum BookingRequestMutationStatus { idle, submitting, success, error }
@@ -30,6 +32,7 @@ class BookingRequestsController extends ChangeNotifier {
   String? _mutationError;
   bool _sessionExpired = false;
   BookingRequestStatus? _statusFilter;
+  BookingRequestsFilter _filter = BookingRequestsFilter.pending;
 
   BookingRequestsListStatus get listStatus => _listStatus;
   BookingRequestDetailStatus get detailStatus => _detailStatus;
@@ -42,6 +45,7 @@ class BookingRequestsController extends ChangeNotifier {
   String? get mutationError => _mutationError;
   bool get sessionExpired => _sessionExpired;
   BookingRequestStatus? get statusFilter => _statusFilter;
+  BookingRequestsFilter get filter => _filter;
 
   Future<void> load({
     bool refresh = false,
@@ -49,6 +53,10 @@ class BookingRequestsController extends ChangeNotifier {
   }) async {
     if (status != null && status != _statusFilter) {
       _statusFilter = status;
+      _filter = BookingRequestsFilter.values.firstWhere(
+        (value) => value.apiStatus == status,
+        orElse: () => BookingRequestsFilter.pending,
+      );
       refresh = true;
     }
     if (_listStatus == BookingRequestsListStatus.loading) return;
@@ -106,6 +114,16 @@ class BookingRequestsController extends ChangeNotifier {
 
   Future<void> clearStatusFilter() async {
     _statusFilter = null;
+    _filter = BookingRequestsFilter.cancelled;
+    await load(refresh: true);
+  }
+
+  Future<void> setFilter(BookingRequestsFilter filter) async {
+    if (_filter == filter && _listStatus != BookingRequestsListStatus.idle) {
+      return;
+    }
+    _filter = filter;
+    _statusFilter = filter.apiStatus;
     await load(refresh: true);
   }
 
@@ -256,4 +274,13 @@ class BookingRequestsController extends ChangeNotifier {
       await _sessionController.logout();
     }
   }
+}
+
+extension BookingRequestsFilterApi on BookingRequestsFilter {
+  BookingRequestStatus? get apiStatus => switch (this) {
+    BookingRequestsFilter.pending => BookingRequestStatus.pending,
+    BookingRequestsFilter.booked => BookingRequestStatus.booked,
+    BookingRequestsFilter.expired => BookingRequestStatus.expired,
+    BookingRequestsFilter.cancelled => null,
+  };
 }

@@ -9,8 +9,6 @@ import '../domain/booking_request_status.dart';
 import 'booking_requests_controller.dart';
 import 'widgets/booking_request_card.dart';
 
-enum _RequestFilter { pending, booked, expired, cancelled }
-
 class BookingRequestsPage extends StatefulWidget {
   const BookingRequestsPage({required this.controller, super.key});
 
@@ -21,7 +19,6 @@ class BookingRequestsPage extends StatefulWidget {
 }
 
 class _BookingRequestsPageState extends State<BookingRequestsPage> {
-  _RequestFilter _filter = _RequestFilter.pending;
   bool _didLoad = false;
 
   BookingRequestsController get controller => widget.controller;
@@ -32,25 +29,20 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _didLoad) return;
       _didLoad = true;
-      controller.load(status: _apiStatus(_filter));
+      controller.load(status: controller.filter.apiStatus);
     });
   }
 
-  Future<void> _changeFilter(_RequestFilter filter) async {
-    if (_filter == filter) return;
-    setState(() => _filter = filter);
-    if (_isTerminal(filter)) {
-      await controller.clearStatusFilter();
-    } else {
-      await controller.load(refresh: true, status: _apiStatus(filter));
-    }
-  }
+  Future<void> _changeFilter(BookingRequestsFilter filter) async =>
+      controller.setFilter(filter);
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
     animation: controller,
     builder: (context, _) {
-      final items = controller.items.where(_isVisible).toList(growable: false);
+      final items = controller.items
+          .where((request) => _isVisible(request, controller.filter))
+          .toList(growable: false);
       final hasItems = controller.items.isNotEmpty;
       final initialLoading =
           controller.listStatus == BookingRequestsListStatus.loading &&
@@ -66,7 +58,10 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
               children: [
                 _Header(onCreate: () => context.go('/admin/requests/new')),
                 const SizedBox(height: 30),
-                _FilterBar(selected: _filter, onChanged: _changeFilter),
+                _FilterBar(
+                  selected: controller.filter,
+                  onChanged: _changeFilter,
+                ),
                 const SizedBox(height: 20),
                 if (initialLoading)
                   const _LoadingList()
@@ -79,12 +74,12 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
                         'No se pudieron cargar las solicitudes.',
                     onRetry: () => controller.load(
                       refresh: true,
-                      status: _apiStatus(_filter),
+                      status: controller.filter.apiStatus,
                     ),
                   )
                 else if (items.isEmpty)
                   _EmptyState(
-                    filter: _filter,
+                    filter: controller.filter,
                     onCreate: () => context.go('/admin/requests/new'),
                     canLoadMore: controller.nextCursor != null,
                   )
@@ -94,7 +89,7 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
                       message: controller.listError!,
                       onRetry: () => controller.load(
                         refresh: true,
-                        status: _apiStatus(_filter),
+                        status: controller.filter.apiStatus,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -134,27 +129,19 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
     },
   );
 
-  bool _isVisible(BookingRequest request) {
-    return switch (_filter) {
-      _RequestFilter.pending => request.status == BookingRequestStatus.pending,
-      _RequestFilter.booked => request.status == BookingRequestStatus.booked,
-      _RequestFilter.expired => request.status == BookingRequestStatus.expired,
-      _RequestFilter.cancelled =>
+  bool _isVisible(BookingRequest request, BookingRequestsFilter filter) {
+    return switch (filter) {
+      BookingRequestsFilter.pending =>
+        request.status == BookingRequestStatus.pending,
+      BookingRequestsFilter.booked =>
+        request.status == BookingRequestStatus.booked,
+      BookingRequestsFilter.expired =>
+        request.status == BookingRequestStatus.expired,
+      BookingRequestsFilter.cancelled =>
         request.status == BookingRequestStatus.cancelled ||
             request.status == BookingRequestStatus.closed,
     };
   }
-
-  bool _isTerminal(_RequestFilter filter) => filter == _RequestFilter.cancelled;
-
-  BookingRequestStatus? _apiStatus(_RequestFilter filter) => switch (filter) {
-    _RequestFilter.pending => BookingRequestStatus.pending,
-    _RequestFilter.booked => BookingRequestStatus.booked,
-    _RequestFilter.expired => BookingRequestStatus.expired,
-    // The API has separate cancelled/closed filters. Load the unfiltered page
-    // so the prototype can keep one terminal “Canceladas” tab.
-    _RequestFilter.cancelled => null,
-  };
 }
 
 class _Header extends StatelessWidget {
@@ -223,8 +210,8 @@ class _Header extends StatelessWidget {
 class _FilterBar extends StatelessWidget {
   const _FilterBar({required this.selected, required this.onChanged});
 
-  final _RequestFilter selected;
-  final ValueChanged<_RequestFilter> onChanged;
+  final BookingRequestsFilter selected;
+  final ValueChanged<BookingRequestsFilter> onChanged;
 
   @override
   Widget build(BuildContext context) => Wrap(
@@ -233,23 +220,23 @@ class _FilterBar extends StatelessWidget {
     children: [
       _FilterButton(
         label: 'Pendientes',
-        selected: selected == _RequestFilter.pending,
-        onTap: () => onChanged(_RequestFilter.pending),
+        selected: selected == BookingRequestsFilter.pending,
+        onTap: () => onChanged(BookingRequestsFilter.pending),
       ),
       _FilterButton(
         label: 'Agendadas',
-        selected: selected == _RequestFilter.booked,
-        onTap: () => onChanged(_RequestFilter.booked),
+        selected: selected == BookingRequestsFilter.booked,
+        onTap: () => onChanged(BookingRequestsFilter.booked),
       ),
       _FilterButton(
         label: 'Vencidas',
-        selected: selected == _RequestFilter.expired,
-        onTap: () => onChanged(_RequestFilter.expired),
+        selected: selected == BookingRequestsFilter.expired,
+        onTap: () => onChanged(BookingRequestsFilter.expired),
       ),
       _FilterButton(
         label: 'Canceladas',
-        selected: selected == _RequestFilter.cancelled,
-        onTap: () => onChanged(_RequestFilter.cancelled),
+        selected: selected == BookingRequestsFilter.cancelled,
+        onTap: () => onChanged(BookingRequestsFilter.cancelled),
       ),
     ],
   );
@@ -340,7 +327,7 @@ class _EmptyState extends StatelessWidget {
     required this.canLoadMore,
   });
 
-  final _RequestFilter filter;
+  final BookingRequestsFilter filter;
   final VoidCallback onCreate;
   final bool canLoadMore;
 
@@ -373,7 +360,7 @@ class _EmptyState extends StatelessWidget {
           style: const TextStyle(color: InkSlotColors.secondary),
           textAlign: TextAlign.center,
         ),
-        if (!canLoadMore && filter == _RequestFilter.pending) ...[
+        if (!canLoadMore && filter == BookingRequestsFilter.pending) ...[
           const SizedBox(height: 22),
           SizedBox(
             width: 260,
@@ -503,20 +490,20 @@ class _LoadMoreButton extends StatelessWidget {
   );
 }
 
-String _emptyTitle(_RequestFilter filter) => switch (filter) {
-  _RequestFilter.pending => 'No tienes solicitudes pendientes',
-  _RequestFilter.booked => 'No tienes solicitudes agendadas',
-  _RequestFilter.expired => 'No tienes solicitudes vencidas',
-  _RequestFilter.cancelled => 'No tienes solicitudes canceladas',
+String _emptyTitle(BookingRequestsFilter filter) => switch (filter) {
+  BookingRequestsFilter.pending => 'No tienes solicitudes pendientes',
+  BookingRequestsFilter.booked => 'No tienes solicitudes agendadas',
+  BookingRequestsFilter.expired => 'No tienes solicitudes vencidas',
+  BookingRequestsFilter.cancelled => 'No tienes solicitudes canceladas',
 };
 
-String _emptyDescription(_RequestFilter filter) => switch (filter) {
-  _RequestFilter.pending =>
+String _emptyDescription(BookingRequestsFilter filter) => switch (filter) {
+  BookingRequestsFilter.pending =>
     'Crea una solicitud para compartir un enlace privado con tu cliente.',
-  _RequestFilter.booked =>
+  BookingRequestsFilter.booked =>
     'Las solicitudes que tus clientes agenden aparecerán aquí.',
-  _RequestFilter.expired =>
+  BookingRequestsFilter.expired =>
     'Los enlaces que superen su fecha límite aparecerán aquí.',
-  _RequestFilter.cancelled =>
+  BookingRequestsFilter.cancelled =>
     'Las solicitudes revocadas o cerradas aparecerán aquí.',
 };

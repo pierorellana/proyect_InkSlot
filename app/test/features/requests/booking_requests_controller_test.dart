@@ -47,6 +47,23 @@ void main() {
     expect(repository.statuses, [BookingRequestStatus.expired]);
   });
 
+  test(
+    'keeps the UI filter when the page is rebuilt after navigation',
+    () async {
+      final repository = FakeBookingRequestsRepository(
+        listPages: [
+          BookingRequestPage(items: [_request('request-1')], nextCursor: null),
+        ],
+      );
+      final controller = BookingRequestsController(repository);
+
+      await controller.setFilter(BookingRequestsFilter.cancelled);
+
+      expect(controller.filter, BookingRequestsFilter.cancelled);
+      expect(controller.statusFilter, isNull);
+    },
+  );
+
   test('returns an ephemeral link for create and renew', () async {
     final repository = FakeBookingRequestsRepository(
       createResult: _actionResult('created'),
