@@ -1,4 +1,6 @@
 import type { PrismaService } from '../database/prisma.service';
+import { CalendarProviderError } from '../calendar/calendar.provider';
+import { CalendarSyncError } from './calendar-sync.service';
 import {
   OUTBOX_WORKER_INTERVAL,
   type ClaimedOutboxEvent,
@@ -6,7 +8,11 @@ import {
   type SchedulerRegistryPort,
   type SyncConfig,
 } from './sync.constants';
-import { OutboxWorkerService } from './outbox-worker.service';
+import {
+  createOutboxEventProcessor,
+  OutboxWorkerService,
+} from './outbox-worker.service';
+import type { SyncIssuesService } from './sync-issues.service';
 
 describe('OutboxWorkerService', () => {
   const config: SyncConfig = {
@@ -123,6 +129,105 @@ describe('OutboxWorkerService', () => {
 
     await expect(worker.drainOnce()).resolves.toBe(2);
     expect(processor).toHaveBeenCalledTimes(2);
+  });
+
+  it('composes CalendarSyncService and SyncIssuesService into the real processor', async () => {
+    const calendarSync = {
+      process: jest.fn().mockResolvedValue({
+        appointmentId: firstEvent.aggregateId,
+        calendarId: 'calendar-1',
+        externalEventId: 'event-1',
+        etag: null,
+      }),
+    };
+    const syncIssues = {
+      finalizeSuccess: jest.fn().mockResolvedValue(undefined),
+      finalizeFailure: jest.fn().mockResolvedValue(undefined),
+    };
+    const realProcessor = createOutboxEventProcessor(
+      calendarSync as never,
+      syncIssues as unknown as SyncIssuesService,
+      config,
+    );
+
+    await realProcessor(firstEvent);
+
+    expect(calendarSync.process).toHaveBeenCalledWith(firstEvent);
+    expect(syncIssues.finalizeSuccess).toHaveBeenCalledWith(firstEvent.id, {
+      appointmentId: firstEvent.aggregateId,
+      calendarId: 'calendar-1',
+      externalEventId: 'event-1',
+      etag: null,
+    });
+    expect(syncIssues.finalizeFailure).not.toHaveBeenCalled();
+  });
+
+  it('converts handler failures to safe finalization without rejecting the processor', async () => {
+    const calendarSync = {
+      process: jest.fn().mockRejectedValue(
+        new CalendarSyncError({
+          code: 'CALENDAR_UNAVAILABLE',
+          message: 'private provider detail',
+          retryable: true,
+        }),
+      ),
+    };
+    const syncIssues = {
+      finalizeSuccess: jest.fn(),
+      finalizeFailure: jest.fn().mockResolvedValue(undefined),
+    };
+    const realProcessor = createOutboxEventProcessor(
+      calendarSync as never,
+      syncIssues as unknown as SyncIssuesService,
+      config,
+    );
+
+    await expect(realProcessor(firstEvent)).resolves.toBeUndefined();
+    expect(syncIssues.finalizeFailure).toHaveBeenCalledWith(
+      firstEvent,
+      expect.objectContaining({
+        code: 'CALENDAR_UNAVAILABLE',
+        retryable: true,
+      }),
+      config,
+    );
+    expect(JSON.stringify(syncIssues.finalizeFailure.mock.calls)).not.toContain(
+      'private provider detail',
+    );
+  });
+
+  it('maps a raw provider reauthentication error to a terminal safe failure', async () => {
+    const calendarSync = {
+      process: jest
+        .fn()
+        .mockRejectedValue(
+          new CalendarProviderError(
+            'CALENDAR_REAUTH_REQUIRED',
+            'private auth detail',
+          ),
+        ),
+    };
+    const syncIssues = {
+      finalizeSuccess: jest.fn(),
+      finalizeFailure: jest.fn().mockResolvedValue(undefined),
+    };
+    const realProcessor = createOutboxEventProcessor(
+      calendarSync as never,
+      syncIssues as unknown as SyncIssuesService,
+      config,
+    );
+
+    await realProcessor(firstEvent);
+
+    expect(syncIssues.finalizeFailure).toHaveBeenCalledWith(
+      firstEvent,
+      {
+        code: 'CALENDAR_REAUTH_REQUIRED',
+        message: 'La conexión de Google requiere autorización nuevamente',
+        retryable: false,
+      },
+      config,
+    );
   });
 
   it('does not overlap local drains', async () => {

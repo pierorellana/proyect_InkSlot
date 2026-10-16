@@ -1,5 +1,6 @@
 export const SYNC_CONFIG = Symbol('SYNC_CONFIG');
 export const OUTBOX_EVENT_PROCESSOR = Symbol('OUTBOX_EVENT_PROCESSOR');
+export const SYNC_RANDOM = Symbol('SYNC_RANDOM');
 export const SCHEDULER_REGISTRY = Symbol('SCHEDULER_REGISTRY');
 export const OUTBOX_WORKER_INTERVAL = 'OUTBOX_WORKER_INTERVAL';
 export const OUTBOX_CREATE_EVENT = 'appointment.calendar.create';

@@ -16,8 +16,15 @@ import {
   type OutboxEventProcessor,
   type SchedulerRegistryPort,
   SYNC_CONFIG,
+  type SyncFailureCode,
   type SyncConfig,
 } from './sync.constants';
+import { CalendarProviderError } from '../calendar/calendar.provider';
+import {
+  CalendarSyncError,
+  CalendarSyncService,
+} from './calendar-sync.service';
+import { SyncIssuesService } from './sync-issues.service';
 
 type RawClaimedOutboxEvent = {
   id: string;
@@ -25,6 +32,65 @@ type RawClaimedOutboxEvent = {
   type: string;
   payload: unknown;
   attempts: number;
+};
+
+export const createOutboxEventProcessor = (
+  calendarSync: CalendarSyncService,
+  syncIssues: SyncIssuesService,
+  config: SyncConfig,
+): OutboxEventProcessor => {
+  return async (event) => {
+    let success: Awaited<ReturnType<CalendarSyncService['process']>>;
+    try {
+      success = await calendarSync.process(event);
+    } catch (error) {
+      await syncIssues.finalizeFailure(event, toSafeSyncFailure(error), config);
+      return;
+    }
+
+    await syncIssues.finalizeSuccess(event.id, success);
+  };
+};
+
+const toSafeSyncFailure = (error: unknown) => {
+  if (error instanceof CalendarSyncError) {
+    return {
+      ...error.failure,
+      message: safeMessage(error.failure.code),
+    };
+  }
+
+  if (
+    error instanceof CalendarProviderError &&
+    error.code === 'CALENDAR_REAUTH_REQUIRED'
+  ) {
+    return {
+      code: 'CALENDAR_REAUTH_REQUIRED' as const,
+      message: 'La conexión de Google requiere autorización nuevamente',
+      retryable: false,
+    };
+  }
+
+  return {
+    code: 'CALENDAR_UNAVAILABLE' as const,
+    message: safeMessage('CALENDAR_UNAVAILABLE'),
+    retryable: true,
+  };
+};
+
+const safeMessage = (code: SyncFailureCode): string => {
+  switch (code) {
+    case 'CALENDAR_REAUTH_REQUIRED':
+      return 'La conexión de Google requiere autorización nuevamente';
+    case 'CALENDAR_UNAVAILABLE':
+      return 'No fue posible sincronizar el evento con Google Calendar';
+    case 'APPOINTMENT_NOT_FOUND':
+      return 'La reserva no existe';
+    case 'OUTBOX_PAYLOAD_INVALID':
+      return 'El evento de sincronización no tiene un payload válido';
+    case 'SYNC_ATTEMPTS_EXHAUSTED':
+      return 'Se agotaron los intentos de sincronización';
+  }
 };
 
 @Injectable()
