@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   HttpException,
   Injectable,
   ServiceUnavailableException,
@@ -20,6 +21,7 @@ import {
   DATE_ONLY_PATTERN,
   PublicAvailabilityQueryDto,
 } from './public-availability.dto';
+import type { PublicSlotCheck } from './public-slot-check.types';
 
 const MAX_RANGE_DAYS = 31;
 
@@ -53,10 +55,71 @@ export class PublicAvailabilityService {
   ): Promise<AvailabilityResult> {
     this.validateQuery(query);
     const context = await this.requests.resolvePublicAvailabilityContext(token);
-    const from = DateTime.fromISO(query.from, {
+    return this.calculate(context, query.from, query.to);
+  }
+
+  async assertSlotAvailable(
+    token: string,
+    startAt: Date,
+  ): Promise<PublicSlotCheck> {
+    if (!(startAt instanceof Date) || !Number.isFinite(startAt.getTime())) {
+      throw badRequest('La fecha de inicio no es válida');
+    }
+
+    const context = await this.requests.resolvePublicAvailabilityContext(token);
+    const localStart = DateTime.fromJSDate(startAt, {
+      zone: context.timezone,
+    });
+    const date = localStart.toISODate();
+    if (
+      !date ||
+      !localStart.isValid ||
+      !IANAZone.isValidZone(context.timezone)
+    ) {
+      throw availabilityNotConfigured();
+    }
+
+    const endAt = new Date(
+      startAt.getTime() + context.durationMinutes * 60_000,
+    );
+    const refreshed = await this.calculate(context, date, date);
+    const exactSlot = refreshed.days
+      .flatMap((day) => day.slots)
+      .find(
+        (slot) =>
+          slot.startAt === startAt.toISOString() &&
+          slot.endAt === endAt.toISOString(),
+      );
+
+    if (!exactSlot) {
+      throw new ConflictException({
+        error: {
+          code: 'SLOT_UNAVAILABLE',
+          message: 'El horario seleccionado ya no está disponible',
+        },
+        availability: refreshed,
+      });
+    }
+
+    return {
+      startAt,
+      endAt,
+      timezone: refreshed.timezone,
+      refreshed,
+    };
+  }
+
+  private async calculate(
+    context: Awaited<
+      ReturnType<BookingRequestsService['resolvePublicAvailabilityContext']>
+    >,
+    fromDate: string,
+    toDate: string,
+  ): Promise<AvailabilityResult> {
+    const from = DateTime.fromISO(fromDate, {
       zone: context.timezone,
     }).startOf('day');
-    const to = DateTime.fromISO(query.to, {
+    const to = DateTime.fromISO(toDate, {
       zone: context.timezone,
     }).startOf('day');
     if (
@@ -111,8 +174,8 @@ export class PublicAvailabilityService {
     try {
       return this.engine.calculate({
         timezone: settings.timezone,
-        fromDate: query.from,
-        toDate: query.to,
+        fromDate,
+        toDate,
         now: new Date(),
         durationMinutes: context.durationMinutes,
         slotStepMinutes: settings.slotStepMinutes,

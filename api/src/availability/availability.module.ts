@@ -24,5 +24,6 @@ import { PublicAvailabilityService } from './public-availability.service';
     AvailabilityEngine,
     PublicAvailabilityService,
   ],
+  exports: [AvailabilityEngine, PublicAvailabilityService],
 })
 export class AvailabilityModule {}
