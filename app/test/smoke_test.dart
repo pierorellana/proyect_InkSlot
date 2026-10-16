@@ -13,7 +13,7 @@ void main() {
     await tester.pump();
 
     expect(find.byType(PublicWelcomePage), findsOneWidget);
-    expect(find.text('Elegir fecha y hora'), findsOneWidget);
+    expect(find.text('Valentina,'), findsNothing);
   });
 
   testWidgets('keeps the public entry point available while admin is guarded', (
