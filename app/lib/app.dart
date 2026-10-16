@@ -7,6 +7,10 @@ import 'core/theme/inkslot_theme.dart';
 import 'core/network/api_client.dart';
 import 'features/auth/data/auth_repository.dart';
 import 'features/auth/presentation/admin_session_controller.dart';
+import 'features/public_booking/data/public_reservation_repository.dart';
+import 'features/public_booking/presentation/public_reservation_controller.dart';
+import 'features/requests/data/booking_requests_repository.dart';
+import 'features/requests/presentation/booking_requests_controller.dart';
 
 class InkSlotApp extends StatefulWidget {
   const InkSlotApp({super.key});
@@ -19,6 +23,8 @@ class _InkSlotAppState extends State<InkSlotApp> {
   late final HttpApiClient _apiClient;
   late final AuthRepository _authRepository;
   late final AdminSessionController _sessionController;
+  late final BookingRequestsController _bookingRequestsController;
+  late final PublicReservationController _publicReservationController;
   late final GoRouter _router;
 
   @override
@@ -27,13 +33,27 @@ class _InkSlotAppState extends State<InkSlotApp> {
     _apiClient = HttpApiClient();
     _authRepository = AuthRepository(_apiClient);
     _sessionController = AdminSessionController(_authRepository);
+    _bookingRequestsController = BookingRequestsController(
+      BookingRequestsRepository(_apiClient),
+      sessionController: _sessionController,
+    );
+    _publicReservationController = PublicReservationController(
+      PublicReservationRepository(_apiClient),
+    );
     _sessionController.restore();
-    _router = AppRouter.create(sessionController: _sessionController);
+    _router = AppRouter.create(
+      sessionController: _sessionController,
+      bookingRequestsController: _bookingRequestsController,
+      publicReservationController: _publicReservationController,
+      apiClient: _apiClient,
+    );
   }
 
   @override
   void dispose() {
     _router.dispose();
+    _publicReservationController.dispose();
+    _bookingRequestsController.dispose();
     _sessionController.dispose();
     _apiClient.close();
     super.dispose();

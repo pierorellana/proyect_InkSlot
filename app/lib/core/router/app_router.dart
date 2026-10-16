@@ -7,8 +7,10 @@ import '../../features/admin/presentation/admin_shell.dart';
 import '../../features/auth/data/auth_repository.dart';
 import '../../features/auth/presentation/admin_login_page.dart';
 import '../../features/auth/presentation/admin_session_controller.dart';
-import '../../features/public_booking/presentation/public_dates_placeholder.dart';
+import '../../features/public_booking/data/public_reservation_repository.dart';
 import '../../features/public_booking/presentation/public_entry_controller.dart';
+import '../../features/public_booking/presentation/public_dates_page.dart';
+import '../../features/public_booking/presentation/public_reservation_controller.dart';
 import '../../features/public_booking/presentation/public_splash_page.dart';
 import '../../features/public_booking/presentation/public_welcome_page.dart';
 import '../../features/requests/data/booking_requests_repository.dart';
@@ -24,10 +26,17 @@ abstract final class AppRouter {
     String initialLocation = '/',
     AdminSessionController? sessionController,
     BookingRequestsController? bookingRequestsController,
+    PublicReservationController? publicReservationController,
+    ApiClient? apiClient,
   }) {
-    final session = sessionController ?? _defaultSessionController();
+    final session =
+        sessionController ?? _defaultSessionController(apiClient);
     final requests =
-        bookingRequestsController ?? _defaultBookingRequestsController(session);
+        bookingRequestsController ??
+        _defaultBookingRequestsController(session, apiClient);
+    final publicReservation =
+        publicReservationController ??
+        _defaultPublicReservationController(apiClient);
 
     return GoRouter(
       initialLocation: initialLocation,
@@ -48,15 +57,25 @@ abstract final class AppRouter {
         ),
         GoRoute(
           path: '/r/:token',
-          builder: (context, state) => PublicWelcomePage(
-            token: state.pathParameters['token'] ?? '',
-            onChooseDate: () =>
-                context.go('/r/${state.pathParameters['token'] ?? ''}/dates'),
+          builder: (context, state) => ChangeNotifierProvider.value(
+            value: publicReservation,
+            child: PublicWelcomePage(
+              controller: publicReservation,
+              token: state.pathParameters['token'] ?? '',
+              onChooseDate: () =>
+                  context.go('/r/${state.pathParameters['token'] ?? ''}/dates'),
+            ),
           ),
         ),
         GoRoute(
           path: '/r/:token/dates',
-          builder: (_, _) => const PublicDatesPlaceholder(),
+          builder: (context, state) => ChangeNotifierProvider.value(
+            value: publicReservation,
+            child: PublicDatesPage(
+              controller: publicReservation,
+              token: state.pathParameters['token'] ?? '',
+            ),
+          ),
         ),
         GoRoute(
           path: '/admin/login',
@@ -126,14 +145,21 @@ abstract final class AppRouter {
     };
   }
 
-  static AdminSessionController _defaultSessionController() =>
-      AdminSessionController(AuthRepository(_UnavailableApiClient()));
+  static AdminSessionController _defaultSessionController(ApiClient? apiClient) =>
+      AdminSessionController(AuthRepository(apiClient ?? _UnavailableApiClient()));
 
   static BookingRequestsController _defaultBookingRequestsController(
     AdminSessionController session,
+    ApiClient? apiClient,
   ) => BookingRequestsController(
-    BookingRequestsRepository(HttpApiClient()),
+    BookingRequestsRepository(apiClient ?? _UnavailableApiClient()),
     sessionController: session,
+  );
+
+  static PublicReservationController _defaultPublicReservationController(
+    ApiClient? apiClient,
+  ) => PublicReservationController(
+    PublicReservationRepository(apiClient ?? _UnavailableApiClient()),
   );
 }
 
