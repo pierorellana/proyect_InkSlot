@@ -15,4 +15,13 @@ void main() {
     expect(find.byType(PublicWelcomePage), findsOneWidget);
     expect(find.text('Elegir fecha y hora'), findsOneWidget);
   });
+
+  testWidgets('keeps the public entry point available while admin is guarded', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const InkSlotApp());
+
+    expect(find.text('SALTAR INTRO'), findsOneWidget);
+    expect(find.text('Ingresar al panel'), findsNothing);
+  });
 }
