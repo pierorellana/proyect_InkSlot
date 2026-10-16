@@ -50,7 +50,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Ana Ink'), findsOneWidget);
-      expect(find.text('Pendiente'), findsOneWidget);
+      expect(find.text('PENDIENTE'), findsOneWidget);
       expect(find.text('Cargar más'), findsOneWidget);
 
       await tester.tap(find.text('Cargar más'));
@@ -60,8 +60,8 @@ void main() {
       await tester.tap(find.text('Canceladas'));
       await tester.pumpAndSettle();
       expect(find.text('Cerrada Ink'), findsOneWidget);
-      expect(find.text('Cerrada'), findsOneWidget);
-      expect(find.text('Cancelada'), findsOneWidget);
+      expect(find.text('CERRADA'), findsOneWidget);
+      expect(find.text('CANCELADA'), findsOneWidget);
     },
   );
 

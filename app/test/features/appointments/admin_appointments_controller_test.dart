@@ -114,9 +114,7 @@ void main() {
     final first = controller.load();
     final second = controller.load();
     expect(repository.calls, 1);
-    repository.complete(
-      const AdminAppointmentPage(items: [], nextCursor: null),
-    );
+    repository.finish(const AdminAppointmentPage(items: [], nextCursor: null));
     await Future.wait([first, second]);
   });
 }
@@ -160,7 +158,7 @@ class BlockingAppointmentsRepository extends AdminAppointmentsRepository {
     return _completer.future;
   }
 
-  void complete(AdminAppointmentPage page) {
+  void finish(AdminAppointmentPage page) {
     _completer.complete(page);
   }
 }

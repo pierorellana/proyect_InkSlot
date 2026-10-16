@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
-import '../../../core/widgets/inkslot_mono_label.dart';
-import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../../core/widgets/inkslot_icon.dart';
+import '../../../core/widgets/inkslot_kit.dart';
+import '../../../core/widgets/inkslot_motion.dart';
+import '../../../core/widgets/inkslot_state_block.dart';
 import '../domain/booking_request.dart';
 import '../domain/booking_request_status.dart';
 import 'booking_requests_controller.dart';
@@ -44,84 +46,109 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
           .where((request) => _isVisible(request, controller.filter))
           .toList(growable: false);
       final hasItems = controller.items.isNotEmpty;
-      final initialLoading =
-          controller.listStatus == BookingRequestsListStatus.loading &&
-          !hasItems;
-      return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(4, 4, 4, 32),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 980),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _Header(onCreate: () => context.go('/admin/requests/new')),
-                const SizedBox(height: 30),
-                _FilterBar(
-                  selected: controller.filter,
-                  onChanged: _changeFilter,
-                ),
-                const SizedBox(height: 20),
-                if (initialLoading)
-                  const _LoadingList()
-                else if (controller.listStatus ==
-                        BookingRequestsListStatus.error &&
-                    !hasItems)
-                  _ErrorState(
-                    message:
-                        controller.listError ??
-                        'No se pudieron cargar las solicitudes.',
-                    onRetry: () => controller.load(
-                      refresh: true,
-                      status: controller.filter.apiStatus,
+      final loading =
+          controller.listStatus == BookingRequestsListStatus.loading;
+      final initialLoading = loading && !hasItems;
+      final filter = controller.filter;
+      void reload() => controller.load(refresh: true, status: filter.apiStatus);
+      final top = MediaQuery.paddingOf(context).top;
+      return InkSlotScreenIn(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, top < 58 ? 58 : top, 20, 120),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InkSlotRise.step(
+                    0,
+                    child: _Header(
+                      onCreate: () => context.go('/admin/requests/new'),
                     ),
-                  )
-                else if (items.isEmpty)
-                  _EmptyState(
-                    filter: controller.filter,
-                    onCreate: () => context.go('/admin/requests/new'),
-                    canLoadMore: controller.nextCursor != null,
-                  )
-                else ...[
-                  if (controller.listError != null) ...[
-                    _InlineError(
-                      message: controller.listError!,
-                      onRetry: () => controller.load(
-                        refresh: true,
-                        status: controller.filter.apiStatus,
+                  ),
+                  const SizedBox(height: 18),
+                  InkSlotRise.step(
+                    1,
+                    child: _FilterBar(
+                      selected: filter,
+                      count: initialLoading || controller.listError != null
+                          ? null
+                          : items.length,
+                      more: controller.nextCursor != null,
+                      onChanged: _changeFilter,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (initialLoading)
+                    const InkSlotSkeletonRows(count: 4)
+                  else if (controller.listStatus ==
+                          BookingRequestsListStatus.error &&
+                      !hasItems)
+                    InkSlotStateBlock(
+                      icon: InkSlotIcons.sinConexion,
+                      title: 'No pudimos cargar tus solicitudes.',
+                      body:
+                          controller.listError ??
+                          'No se pudieron cargar las solicitudes.',
+                      actionLabel: 'Reintentar',
+                      onAction: reload,
+                    )
+                  else if (items.isEmpty)
+                    InkSlotStateBlock(
+                      icon: InkSlotIcons.enlace,
+                      title: controller.nextCursor != null
+                          ? 'Sigue buscando.'
+                          : _emptyTitle(filter),
+                      body: controller.nextCursor != null
+                          ? 'Hay más solicitudes por cargar.'
+                          : _emptyDescription(filter),
+                      actionLabel: controller.nextCursor != null
+                          ? 'Cargar más'
+                          : filter == BookingRequestsFilter.pending
+                          ? 'Nueva solicitud'
+                          : null,
+                      onAction: controller.nextCursor != null
+                          ? controller.loadMore
+                          : () => context.go('/admin/requests/new'),
+                    )
+                  else ...[
+                    if (controller.listError != null) ...[
+                      _InlineError(
+                        message: controller.listError!,
+                        onRetry: reload,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    InkSlotRise.step(
+                      2,
+                      child: InkSlotCard(
+                        child: Column(
+                          children: [
+                            for (var i = 0; i < items.length; i++) ...[
+                              if (i > 0) const InkSlotSep(indent: 0),
+                              BookingRequestCard(
+                                request: items[i],
+                                onTap: () => context.go(
+                                  '/admin/requests/${items[i].id}',
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 14),
+                    if (controller.nextCursor != null) ...[
+                      const SizedBox(height: 16),
+                      InkSlotGhostButton(
+                        label: loading ? 'Cargando…' : 'Cargar más',
+                        onPressed: loading ? null : controller.loadMore,
+                      ),
+                    ],
                   ],
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: items.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final request = items[index];
-                      return BookingRequestCard(
-                        request: request,
-                        onTap: () =>
-                            context.go('/admin/requests/${request.id}'),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  if (controller.nextCursor != null)
-                    _LoadMoreButton(
-                      loading:
-                          controller.listStatus ==
-                          BookingRequestsListStatus.loading,
-                      onPressed:
-                          controller.listStatus ==
-                              BookingRequestsListStatus.loading
-                          ? null
-                          : controller.loadMore,
-                    ),
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -150,270 +177,61 @@ class _Header extends StatelessWidget {
   final VoidCallback onCreate;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final compact = constraints.maxWidth < 600;
-      final title = Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const InkSlotMonoLabel('Espacio de trabajo'),
-          const SizedBox(height: 14),
-          Text('Solicitudes', style: Theme.of(context).textTheme.displaySmall),
-          const SizedBox(height: 9),
-          const Text(
-            'Gestiona los espacios que tus clientes pueden reservar.',
-            style: TextStyle(color: InkSlotColors.secondary),
-          ),
-        ],
-      );
-      final action = compact
-          ? IconButton.filled(
-              onPressed: onCreate,
-              tooltip: 'Nueva solicitud',
-              icon: const Icon(Icons.add),
-              style: IconButton.styleFrom(
-                backgroundColor: InkSlotColors.copper,
-                foregroundColor: InkSlotColors.ink,
-                minimumSize: const Size(48, 48),
-              ),
-            )
-          : SizedBox(
-              width: 280,
-              child: InkSlotPrimaryButton(
-                label: 'Nueva solicitud',
-                onPressed: onCreate,
-                trailing: const Icon(Icons.add, size: 19),
-              ),
-            );
-      if (compact) {
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: title),
-            const SizedBox(width: 12),
-            action,
-          ],
-        );
-      }
-      return Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(child: title),
-          const SizedBox(width: 20),
-          action,
-        ],
-      );
-    },
-  );
-}
-
-class _FilterBar extends StatelessWidget {
-  const _FilterBar({required this.selected, required this.onChanged});
-
-  final BookingRequestsFilter selected;
-  final ValueChanged<BookingRequestsFilter> onChanged;
-
-  @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.center,
     children: [
-      _FilterButton(
-        label: 'Pendientes',
-        selected: selected == BookingRequestsFilter.pending,
-        onTap: () => onChanged(BookingRequestsFilter.pending),
-      ),
-      _FilterButton(
-        label: 'Agendadas',
-        selected: selected == BookingRequestsFilter.booked,
-        onTap: () => onChanged(BookingRequestsFilter.booked),
-      ),
-      _FilterButton(
-        label: 'Vencidas',
-        selected: selected == BookingRequestsFilter.expired,
-        onTap: () => onChanged(BookingRequestsFilter.expired),
-      ),
-      _FilterButton(
-        label: 'Canceladas',
-        selected: selected == BookingRequestsFilter.cancelled,
-        onTap: () => onChanged(BookingRequestsFilter.cancelled),
+      Expanded(child: Text('Solicitudes', style: inkSlotSerif(42))),
+      InkSlotIconButton(
+        icon: InkSlotIcons.mas,
+        semanticLabel: 'Nueva solicitud',
+        onPressed: onCreate,
       ),
     ],
   );
 }
 
-class _FilterButton extends StatelessWidget {
-  const _FilterButton({
-    required this.label,
+class _FilterBar extends StatelessWidget {
+  const _FilterBar({
     required this.selected,
-    required this.onTap,
+    required this.count,
+    required this.more,
+    required this.onChanged,
   });
 
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
+  final BookingRequestsFilter selected;
+  final int? count;
+  final bool more;
+  final ValueChanged<BookingRequestsFilter> onChanged;
+
+  static const _labels = {
+    BookingRequestsFilter.pending: 'Pendientes',
+    BookingRequestsFilter.booked: 'Agendadas',
+    BookingRequestsFilter.expired: 'Vencidas',
+    BookingRequestsFilter.cancelled: 'Canceladas',
+  };
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    selected: selected,
-    label: 'Filtrar por $label',
-    child: Material(
-      color: selected ? InkSlotColors.tobacco : Colors.transparent,
-      borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-        child: Container(
-          constraints: const BoxConstraints(
-            minHeight: InkSlotSpacing.minimumTapTarget,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? InkSlotColors.copper : InkSlotColors.line,
-            ),
-            borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected
-                  ? InkSlotColors.copperLight
-                  : InkSlotColors.secondary,
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _LoadingList extends StatelessWidget {
-  const _LoadingList();
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: List.generate(
-      3,
-      (index) => Padding(
-        padding: EdgeInsets.only(bottom: index == 2 ? 0 : 12),
-        child: Container(
-          height: 136,
-          decoration: BoxDecoration(
-            color: InkSlotColors.surface,
-            borderRadius: BorderRadius.circular(InkSlotRadii.card),
-            border: Border.all(color: InkSlotColors.line),
-          ),
-          child: const Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({
-    required this.filter,
-    required this.onCreate,
-    required this.canLoadMore,
-  });
-
-  final BookingRequestsFilter filter;
-  final VoidCallback onCreate;
-  final bool canLoadMore;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 42),
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.line),
-    ),
-    child: Column(
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    clipBehavior: Clip.none,
+    child: Row(
       children: [
-        const Icon(
-          Icons.inbox_outlined,
-          size: 38,
-          color: InkSlotColors.copperLight,
-        ),
-        const SizedBox(height: 18),
-        Text(
-          canLoadMore ? 'Sigue buscando' : _emptyTitle(filter),
-          style: Theme.of(context).textTheme.titleLarge,
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          canLoadMore
-              ? 'Hay más solicitudes por cargar.'
-              : _emptyDescription(filter),
-          style: const TextStyle(color: InkSlotColors.secondary),
-          textAlign: TextAlign.center,
-        ),
-        if (!canLoadMore && filter == BookingRequestsFilter.pending) ...[
-          const SizedBox(height: 22),
-          SizedBox(
-            width: 260,
-            child: InkSlotPrimaryButton(
-              label: 'Nueva solicitud',
-              onPressed: onCreate,
-              trailing: const Icon(Icons.add, size: 19),
+        for (final entry in _labels.entries) ...[
+          if (entry.key != BookingRequestsFilter.pending)
+            const SizedBox(width: 12),
+          Semantics(
+            selected: entry.key == selected,
+            label: 'Filtrar por ${entry.value}',
+            excludeSemantics: true,
+            button: true,
+            child: InkSlotChip(
+              label: entry.value,
+              selected: entry.key == selected,
+              trailingCount: entry.key == selected && !more ? count : null,
+              onTap: () => onChanged(entry.key),
             ),
           ),
         ],
-      ],
-    ),
-  );
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      color: const Color(0xFF241614),
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.error.withValues(alpha: .35)),
-    ),
-    child: Column(
-      children: [
-        const Icon(
-          Icons.cloud_off_outlined,
-          color: InkSlotColors.errorText,
-          size: 34,
-        ),
-        const SizedBox(height: 14),
-        const Text(
-          'No pudimos cargar tus solicitudes',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-        const SizedBox(height: 7),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: InkSlotColors.secondary),
-        ),
-        const SizedBox(height: 18),
-        TextButton.icon(
-          onPressed: onRetry,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Reintentar'),
-        ),
       ],
     ),
   );
@@ -428,73 +246,46 @@ class _InlineError extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     liveRegion: true,
-    child: Material(
-      color: const Color(0xFF241614),
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.error_outline,
-              color: InkSlotColors.errorText,
-              size: 19,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                message,
-                style: const TextStyle(
-                  color: InkSlotColors.errorText,
-                  fontSize: 13,
-                ),
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: const Color(0x24E2604C),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          const InkSlotIcon(
+            InkSlotIcons.alerta,
+            size: 20,
+            color: InkSlotColors.errorText,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: InkSlotColors.errorText,
+                fontSize: 13,
               ),
             ),
-            IconButton(
-              onPressed: onRetry,
-              tooltip: 'Reintentar',
-              icon: const Icon(Icons.refresh, size: 19),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-class _LoadMoreButton extends StatelessWidget {
-  const _LoadMoreButton({required this.loading, required this.onPressed});
-
-  final bool loading;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) => Center(
-    child: OutlinedButton.icon(
-      onPressed: onPressed,
-      icon: loading
-          ? const SizedBox(
-              width: 17,
-              height: 17,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.expand_more),
-      label: Text(loading ? 'Cargando…' : 'Cargar más'),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: InkSlotColors.copperLight,
-        side: const BorderSide(color: InkSlotColors.lineStrong),
-        minimumSize: const Size(160, 48),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          ),
+          InkSlotIconButton(
+            icon: InkSlotIcons.sincronizar,
+            semanticLabel: 'Reintentar',
+            onPressed: onRetry,
+            color: InkSlotColors.errorText,
+          ),
+        ],
       ),
     ),
   );
 }
 
 String _emptyTitle(BookingRequestsFilter filter) => switch (filter) {
-  BookingRequestsFilter.pending => 'No tienes solicitudes pendientes',
-  BookingRequestsFilter.booked => 'No tienes solicitudes agendadas',
-  BookingRequestsFilter.expired => 'No tienes solicitudes vencidas',
-  BookingRequestsFilter.cancelled => 'No tienes solicitudes canceladas',
+  BookingRequestsFilter.pending => 'Nada pendiente.',
+  BookingRequestsFilter.booked => 'Nada agendado.',
+  BookingRequestsFilter.expired => 'Nada vencido.',
+  BookingRequestsFilter.cancelled => 'Nada cancelado.',
 };
 
 String _emptyDescription(BookingRequestsFilter filter) => switch (filter) {

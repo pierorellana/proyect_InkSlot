@@ -33,14 +33,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ana Ink'), findsOneWidget);
-    expect(find.text('Confirmada'), findsOneWidget);
-    expect(find.text('Calendar: sincronizado'), findsOneWidget);
+    expect(find.text('CONFIRMADA'), findsOneWidget);
+    expect(find.text('Sincronizada'), findsOneWidget);
 
     await tester.tap(find.text('Completadas'));
     await tester.pumpAndSettle();
 
     expect(controller.filter, AdminAppointmentStatus.completed);
-    expect(find.text('Completada'), findsOneWidget);
+    expect(find.text('COMPLETADA'), findsOneWidget);
     expect(repository.statuses, [
       AdminAppointmentStatus.confirmed,
       AdminAppointmentStatus.completed,

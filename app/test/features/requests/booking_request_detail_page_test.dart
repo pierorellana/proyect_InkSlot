@@ -32,7 +32,7 @@ void main() {
     expect(find.text('Ana Ink'), findsAtLeastNWidgets(1));
     expect(find.text('TRX-123'), findsOneWidget);
     expect(find.text('Solicitud creada'), findsOneWidget);
-    expect(find.text('Pendiente'), findsOneWidget);
+    expect(find.text('PENDIENTE'), findsOneWidget);
     expect(find.text('Anticipo'), findsOneWidget);
     expect(find.textContaining('raw-'), findsNothing);
   });
@@ -62,13 +62,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Acciones'));
+    await tester.tap(find.text('Revocar'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Revocar solicitud'));
-    await tester.pumpAndSettle();
-    expect(find.text('¿Revocar la solicitud?'), findsOneWidget);
+    expect(find.text('¿Revocar el enlace?'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Revocar'));
+    await tester.tap(find.text('Revocar enlace'));
     await tester.pumpAndSettle();
 
     expect(find.text('La solicitud ya fue reservada.'), findsOneWidget);
@@ -99,7 +97,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('RESERVA'), findsOneWidget);
+    expect(find.text('Enlace activo'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

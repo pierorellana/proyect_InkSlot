@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
-import '../../../core/widgets/inkslot_mono_label.dart';
-import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../../core/widgets/inkslot_icon.dart';
+import '../../../core/widgets/inkslot_kit.dart';
+import '../../../core/widgets/inkslot_motion.dart';
+import '../../../core/widgets/inkslot_state_block.dart';
 import '../domain/admin_appointment.dart';
 import 'admin_appointments_controller.dart';
 
@@ -48,90 +50,97 @@ class _AdminAppointmentsPageState extends State<AdminAppointmentsPage> {
     animation: controller,
     builder: (context, _) {
       final hasItems = controller.items.isNotEmpty;
-      final initialLoading =
-          controller.status == AdminAppointmentsStatus.loading && !hasItems;
+      final loading = controller.status == AdminAppointmentsStatus.loading;
+      final initialLoading = loading && !hasItems;
+      final items = controller.items;
 
-      return SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(4, 4, 4, 32),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 980),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const _Header(),
-                const SizedBox(height: 30),
-                _FilterBar(
-                  selected: controller.filter,
-                  onChanged: controller.setFilter,
-                ),
-                const SizedBox(height: 20),
-                if (initialLoading)
-                  const _LoadingList()
-                else if (controller.status == AdminAppointmentsStatus.error &&
-                    !hasItems)
-                  _ErrorState(
-                    message:
-                        controller.errorMessage ??
-                        'No se pudieron cargar las citas.',
-                    onRetry: () => controller.load(refresh: true),
-                  )
-                else if (controller.status == AdminAppointmentsStatus.empty)
-                  _EmptyState(filter: controller.filter)
-                else ...[
-                  if (controller.errorMessage != null) ...[
-                    _InlineError(
-                      message: controller.errorMessage!,
-                      onRetry: () => controller.load(refresh: true),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-                  ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: controller.items.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) => AdminAppointmentCard(
-                      appointment: controller.items[index],
+      final media = MediaQuery.of(context);
+      final top = media.padding.top < 58 ? 58.0 : media.padding.top;
+      return InkSlotScreenIn(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(20, top, 20, 120),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  InkSlotRise.step(
+                    0,
+                    child: Text('Citas', style: inkSlotSerif(42)),
+                  ),
+                  const SizedBox(height: 18),
+                  InkSlotRise.step(
+                    1,
+                    child: _FilterBar(
+                      selected: controller.filter,
+                      onChanged: controller.setFilter,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  if (controller.nextCursor != null)
-                    _LoadMoreButton(
-                      loading:
-                          controller.status == AdminAppointmentsStatus.loading,
-                      onPressed:
-                          controller.status == AdminAppointmentsStatus.loading
-                          ? null
-                          : controller.loadMore,
+                  const SizedBox(height: 18),
+                  if (initialLoading)
+                    const InkSlotSkeletonRows(count: 4, avatar: 52)
+                  else if (controller.status == AdminAppointmentsStatus.error &&
+                      !hasItems)
+                    InkSlotStateBlock(
+                      icon: InkSlotIcons.sinConexion,
+                      title: 'No pudimos cargar tus citas.',
+                      body:
+                          controller.errorMessage ??
+                          'No se pudieron cargar las citas.',
+                      actionLabel: 'Reintentar',
+                      onAction: () => controller.load(refresh: true),
+                    )
+                  else if (controller.status == AdminAppointmentsStatus.empty)
+                    InkSlotStateBlock(
+                      icon: InkSlotIcons.calendarioVacio,
+                      title:
+                          'No hay citas ${_emptyFilterLabel(controller.filter)}.',
+                      body:
+                          'Las citas que coincidan con este filtro aparecerán aquí.',
+                    )
+                  else ...[
+                    if (controller.errorMessage != null) ...[
+                      _InlineError(
+                        message: controller.errorMessage!,
+                        onRetry: () => controller.load(refresh: true),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                    InkSlotRise.step(
+                      2,
+                      child: InkSlotCard(
+                        child: Column(
+                          children: [
+                            for (var i = 0; i < items.length; i++) ...[
+                              if (i > 0) const InkSlotSep(indent: 0),
+                              AdminAppointmentCard(
+                                appointment: items[i],
+                                onTap: () => context.go(
+                                  '/admin/appointments/${Uri.encodeComponent(items[i].id)}',
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ),
+                    if (controller.nextCursor != null) ...[
+                      const SizedBox(height: 16),
+                      InkSlotGhostButton(
+                        label: loading ? 'Cargando…' : 'Cargar más',
+                        onPressed: loading ? null : controller.loadMore,
+                      ),
+                    ],
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
       );
     },
-  );
-}
-
-class _Header extends StatelessWidget {
-  const _Header();
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const InkSlotMonoLabel('Espacio de trabajo'),
-      const SizedBox(height: 14),
-      Text('Citas', style: Theme.of(context).textTheme.displaySmall),
-      const SizedBox(height: 9),
-      const Text(
-        'Consulta tus citas y el estado de sincronización con Calendar.',
-        style: TextStyle(color: InkSlotColors.secondary),
-      ),
-    ],
   );
 }
 
@@ -141,316 +150,168 @@ class _FilterBar extends StatelessWidget {
   final AdminAppointmentStatus selected;
   final ValueChanged<AdminAppointmentStatus> onChanged;
 
+  static const _labels = {
+    AdminAppointmentStatus.confirmed: 'Confirmadas',
+    AdminAppointmentStatus.completed: 'Completadas',
+    AdminAppointmentStatus.cancelled: 'Canceladas',
+    AdminAppointmentStatus.noShow: 'No asistió',
+  };
+
   @override
-  Widget build(BuildContext context) => Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: [
-      _FilterButton(
-        label: 'Confirmadas',
-        selected: selected == AdminAppointmentStatus.confirmed,
-        onTap: () => onChanged(AdminAppointmentStatus.confirmed),
-      ),
-      _FilterButton(
-        label: 'Completadas',
-        selected: selected == AdminAppointmentStatus.completed,
-        onTap: () => onChanged(AdminAppointmentStatus.completed),
-      ),
-      _FilterButton(
-        label: 'Canceladas',
-        selected: selected == AdminAppointmentStatus.cancelled,
-        onTap: () => onChanged(AdminAppointmentStatus.cancelled),
-      ),
-      _FilterButton(
-        label: 'No-show',
-        selected: selected == AdminAppointmentStatus.noShow,
-        onTap: () => onChanged(AdminAppointmentStatus.noShow),
-      ),
-    ],
+  Widget build(BuildContext context) => SingleChildScrollView(
+    scrollDirection: Axis.horizontal,
+    clipBehavior: Clip.none,
+    child: Row(
+      children: [
+        for (final entry in _labels.entries) ...[
+          if (entry.key != AdminAppointmentStatus.confirmed)
+            const SizedBox(width: 12),
+          Semantics(
+            selected: entry.key == selected,
+            label: 'Filtrar por ${entry.value}',
+            excludeSemantics: true,
+            button: true,
+            child: InkSlotChip(
+              label: entry.value,
+              selected: entry.key == selected,
+              onTap: () => onChanged(entry.key),
+            ),
+          ),
+        ],
+      ],
+    ),
   );
 }
 
-class _FilterButton extends StatelessWidget {
-  const _FilterButton({
-    required this.label,
-    required this.selected,
-    required this.onTap,
+/// Fila de cita: fecha serif, horario y estado con sincronización.
+class AdminAppointmentCard extends StatelessWidget {
+  const AdminAppointmentCard({
+    required this.appointment,
+    super.key,
+    this.onTap,
   });
 
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    button: true,
-    selected: selected,
-    label: 'Filtrar por $label',
-    child: Material(
-      color: selected ? InkSlotColors.tobacco : Colors.transparent,
-      borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-        child: Container(
-          constraints: const BoxConstraints(
-            minHeight: InkSlotSpacing.minimumTapTarget,
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: selected ? InkSlotColors.copper : InkSlotColors.line,
-            ),
-            borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: selected
-                  ? InkSlotColors.copperLight
-                  : InkSlotColors.secondary,
-              fontSize: 13,
-              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class AdminAppointmentCard extends StatelessWidget {
-  const AdminAppointmentCard({required this.appointment, super.key});
-
   final AdminAppointment appointment;
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-    container: true,
-    label: '${appointment.clientName}, ${_statusLabel(appointment.status)}',
-    child: Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: InkSlotColors.surface,
-        borderRadius: BorderRadius.circular(InkSlotRadii.card),
-        border: Border.all(color: InkSlotColors.line),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 620;
-          final client = _ClientSummary(appointment: appointment);
-          final timing = _TimingSummary(appointment: appointment);
-          final status = _StatusSummary(appointment: appointment);
-          if (compact) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                client,
-                const SizedBox(height: 18),
-                timing,
-                const SizedBox(height: 18),
-                status,
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(flex: 3, child: client),
-              const SizedBox(width: 24),
-              Expanded(flex: 4, child: timing),
-              const SizedBox(width: 24),
-              status,
-            ],
-          );
-        },
-      ),
-    ),
-  );
-}
-
-class _ClientSummary extends StatelessWidget {
-  const _ClientSummary({required this.appointment});
-
-  final AdminAppointment appointment;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const InkSlotMonoLabel('Cliente'),
-      const SizedBox(height: 8),
-      Text(
-        appointment.clientName,
-        style: Theme.of(context).textTheme.titleLarge,
-        overflow: TextOverflow.ellipsis,
-      ),
-    ],
-  );
-}
-
-class _TimingSummary extends StatelessWidget {
-  const _TimingSummary({required this.appointment});
-
-  final AdminAppointment appointment;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final format = DateFormat('dd/MM/yyyy · HH:mm');
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const InkSlotMonoLabel('Horario'),
-        const SizedBox(height: 8),
-        Text(format.format(appointment.startAt.toLocal())),
-        const SizedBox(height: 5),
-        Text(
-          '${appointment.durationMinutes} min · termina ${DateFormat('HH:mm').format(appointment.endAt.toLocal())}',
-          style: const TextStyle(color: InkSlotColors.secondary),
+    final start = appointment.startAt.toLocal();
+    final end = appointment.endAt.toLocal();
+    final (syncLabel, syncColor) = switch (appointment.syncStatus) {
+      AdminAppointmentSyncStatus.pending => (
+        'Pendiente',
+        InkSlotColors.warning,
+      ),
+      AdminAppointmentSyncStatus.synced => (
+        'Sincronizada',
+        InkSlotColors.success,
+      ),
+      AdminAppointmentSyncStatus.failed => (
+        'Con incidencia',
+        InkSlotColors.error,
+      ),
+    };
+    final dot = Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(color: syncColor, shape: BoxShape.circle),
+    );
+    return InkSlotPress(
+      onTap: onTap,
+      scale: .985,
+      semanticLabel:
+          '${appointment.clientName}, ${_statusLabel(appointment.status)}, '
+          'Calendar: $syncLabel',
+      child: ExcludeSemantics(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: InkSlotColors.surfaceTwo,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: FittedBox(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _weekdays[start.weekday - 1].toUpperCase(),
+                        style: inkSlotMono(size: 9, color: InkSlotColors.ash),
+                      ),
+                      const SizedBox(height: 2),
+                      Text('${start.day}', style: inkSlotSerif(26)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      appointment.clientName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: InkSlotColors.bone,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${_hm(start)} – ${_hm(end)} · '
+                      '${_duration(appointment.durationMinutes)}',
+                      style: const TextStyle(
+                        color: InkSlotColors.ash,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  InkSlotPill(
+                    _statusLabel(appointment.status),
+                    tone: _statusTone(appointment.status),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (appointment.syncStatus ==
+                          AdminAppointmentSyncStatus.pending)
+                        InkSlotPulse(child: dot)
+                      else
+                        dot,
+                      const SizedBox(width: 5),
+                      Text(
+                        syncLabel,
+                        style: const TextStyle(
+                          color: InkSlotColors.ash,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
-}
-
-class _StatusSummary extends StatelessWidget {
-  const _StatusSummary({required this.appointment});
-
-  final AdminAppointment appointment;
-
-  @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      _StatusBadge(
-        label: _statusLabel(appointment.status),
-        color: _statusColor(appointment.status),
-      ),
-      const SizedBox(height: 8),
-      Text(
-        'Calendar: ${_syncStatusLabel(appointment.syncStatus)}',
-        style: TextStyle(
-          color: _syncStatusColor(appointment.syncStatus),
-          fontSize: 12,
-        ),
-      ),
-    ],
-  );
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.label, required this.color});
-
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(
-      minHeight: InkSlotSpacing.minimumTapTarget,
-    ),
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    decoration: BoxDecoration(
-      color: color.withValues(alpha: 0.12),
-      borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-      border: Border.all(color: color.withValues(alpha: 0.35)),
-    ),
-    child: Text(
-      label,
-      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
-    ),
-  );
-}
-
-class _LoadingList extends StatelessWidget {
-  const _LoadingList();
-
-  @override
-  Widget build(BuildContext context) => Column(
-    children: List.generate(
-      3,
-      (index) => Padding(
-        padding: EdgeInsets.only(bottom: index == 2 ? 0 : 12),
-        child: Container(
-          height: 150,
-          decoration: BoxDecoration(
-            color: InkSlotColors.surface,
-            borderRadius: BorderRadius.circular(InkSlotRadii.card),
-            border: Border.all(color: InkSlotColors.line),
-          ),
-          child: const Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
-class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.filter});
-
-  final AdminAppointmentStatus filter;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 42),
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.line),
-    ),
-    child: Column(
-      children: [
-        const Icon(
-          Icons.event_available_outlined,
-          size: 38,
-          color: InkSlotColors.copperLight,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'No hay citas ${_emptyFilterLabel(filter)}.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleLarge,
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'Las citas que coincidan con este filtro aparecerán aquí.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: InkSlotColors.secondary),
-        ),
-      ],
-    ),
-  );
-}
-
-class _ErrorState extends StatelessWidget {
-  const _ErrorState({required this.message, required this.onRetry});
-
-  final String message;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(24),
-    decoration: BoxDecoration(
-      color: InkSlotColors.surface,
-      borderRadius: BorderRadius.circular(InkSlotRadii.card),
-      border: Border.all(color: InkSlotColors.error.withValues(alpha: 0.35)),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Text(message, style: const TextStyle(color: InkSlotColors.errorText)),
-        const SizedBox(height: 18),
-        InkSlotPrimaryButton(label: 'Reintentar', onPressed: onRetry),
-      ],
-    ),
-  );
 }
 
 class _InlineError extends StatelessWidget {
@@ -460,79 +321,74 @@ class _InlineError extends StatelessWidget {
   final VoidCallback onRetry;
 
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    decoration: BoxDecoration(
-      color: InkSlotColors.error.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(InkSlotRadii.chip),
-      border: Border.all(color: InkSlotColors.error.withValues(alpha: 0.28)),
-    ),
-    child: Row(
-      children: [
-        Expanded(
-          child: Text(
-            message,
-            style: const TextStyle(color: InkSlotColors.errorText),
+  Widget build(BuildContext context) => Semantics(
+    liveRegion: true,
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(16, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: const Color(0x24E2604C),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          const InkSlotIcon(
+            InkSlotIcons.alerta,
+            size: 20,
+            color: InkSlotColors.errorText,
           ),
-        ),
-        TextButton(onPressed: onRetry, child: const Text('Reintentar')),
-      ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: InkSlotColors.errorText,
+                fontSize: 13,
+              ),
+            ),
+          ),
+          InkSlotIconButton(
+            icon: InkSlotIcons.sincronizar,
+            semanticLabel: 'Reintentar',
+            onPressed: onRetry,
+            color: InkSlotColors.errorText,
+          ),
+        ],
+      ),
     ),
   );
 }
 
-class _LoadMoreButton extends StatelessWidget {
-  const _LoadMoreButton({required this.loading, required this.onPressed});
+const _weekdays = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
 
-  final bool loading;
-  final VoidCallback? onPressed;
+String _hm(DateTime date) =>
+    '${date.hour.toString().padLeft(2, '0')}:'
+    '${date.minute.toString().padLeft(2, '0')}';
 
-  @override
-  Widget build(BuildContext context) => InkSlotPrimaryButton(
-    label: loading ? 'Cargando…' : 'Cargar más',
-    onPressed: onPressed,
-    trailing: loading
-        ? const SizedBox(
-            width: 18,
-            height: 18,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: InkSlotColors.ink,
-            ),
-          )
-        : const Icon(Icons.arrow_downward, size: 18),
-  );
+String _duration(int minutes) {
+  final hours = minutes ~/ 60;
+  final remainder = minutes % 60;
+  if (hours == 0) return '$remainder min';
+  if (remainder == 0) return '$hours h';
+  return '$hours h $remainder min';
 }
 
 String _statusLabel(AdminAppointmentStatus status) => switch (status) {
   AdminAppointmentStatus.confirmed => 'Confirmada',
   AdminAppointmentStatus.completed => 'Completada',
   AdminAppointmentStatus.cancelled => 'Cancelada',
-  AdminAppointmentStatus.noShow => 'No-show',
+  AdminAppointmentStatus.noShow => 'No asistió',
+};
+
+InkSlotPillTone _statusTone(AdminAppointmentStatus status) => switch (status) {
+  AdminAppointmentStatus.confirmed => InkSlotPillTone.pending,
+  AdminAppointmentStatus.completed => InkSlotPillTone.ok,
+  AdminAppointmentStatus.cancelled => InkSlotPillTone.cancelled,
+  AdminAppointmentStatus.noShow => InkSlotPillTone.expired,
 };
 
 String _emptyFilterLabel(AdminAppointmentStatus status) => switch (status) {
   AdminAppointmentStatus.confirmed => 'confirmadas',
   AdminAppointmentStatus.completed => 'completadas',
   AdminAppointmentStatus.cancelled => 'canceladas',
-  AdminAppointmentStatus.noShow => 'no-show',
-};
-
-Color _statusColor(AdminAppointmentStatus status) => switch (status) {
-  AdminAppointmentStatus.confirmed => InkSlotColors.copperLight,
-  AdminAppointmentStatus.completed => InkSlotColors.successText,
-  AdminAppointmentStatus.cancelled => InkSlotColors.errorText,
-  AdminAppointmentStatus.noShow => InkSlotColors.warningText,
-};
-
-String _syncStatusLabel(AdminAppointmentSyncStatus status) => switch (status) {
-  AdminAppointmentSyncStatus.pending => 'pendiente',
-  AdminAppointmentSyncStatus.synced => 'sincronizado',
-  AdminAppointmentSyncStatus.failed => 'con incidencia',
-};
-
-Color _syncStatusColor(AdminAppointmentSyncStatus status) => switch (status) {
-  AdminAppointmentSyncStatus.pending => InkSlotColors.warningText,
-  AdminAppointmentSyncStatus.synced => InkSlotColors.successText,
-  AdminAppointmentSyncStatus.failed => InkSlotColors.errorText,
+  AdminAppointmentStatus.noShow => 'sin asistencia',
 };
