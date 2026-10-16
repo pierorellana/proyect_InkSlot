@@ -1,33 +1,3 @@
-// The E2E Jest config transpiles tests as CommonJS while @nestjs/schedule 12
-// publishes ESM. Keep only its registry surface local to this suite; the
-// outbox worker, Prisma transactions, and PostgreSQL claim remain real.
-jest.mock('@nestjs/schedule', () => {
-  class SchedulerRegistry {
-    private readonly intervals = new Map<string, NodeJS.Timeout>();
-
-    addInterval(name: string, interval: NodeJS.Timeout): void {
-      this.intervals.set(name, interval);
-    }
-
-    deleteInterval(name: string): void {
-      this.intervals.delete(name);
-    }
-  }
-
-  class ScheduleModule {}
-
-  return {
-    ScheduleModule: {
-      forRoot: () => ({
-        module: ScheduleModule,
-        providers: [SchedulerRegistry],
-        exports: [SchedulerRegistry],
-      }),
-    },
-    SchedulerRegistry,
-  };
-});
-
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
