@@ -122,6 +122,12 @@ export type PublicAvailabilityContext = {
   allowedWindows: Array<{ startLocal: string; endLocal: string }> | null;
 };
 
+export type PublicAppointmentContext = {
+  requestId: string;
+  artistId: string;
+  timezone: string;
+};
+
 const safeError = (code: string, message: string) => ({
   error: { code, message },
 });
@@ -143,6 +149,11 @@ const tokenExpired = (): GoneException =>
 const tokenRevoked = (): GoneException =>
   new GoneException(
     safeError('TOKEN_REVOKED', 'El enlace de reserva ya no está disponible'),
+  );
+
+const appointmentNotFound = (): NotFoundException =>
+  new NotFoundException(
+    safeError('APPOINTMENT_NOT_FOUND', 'La reserva no existe'),
   );
 
 const serviceUnavailable = (): ServiceUnavailableException =>
@@ -481,6 +492,25 @@ export class BookingRequestsService {
       allowedWeekdays: this.jsonArray(request.allowedWeekdays),
       allowedWindows: this.jsonWindows(request.allowedWindows),
     };
+  }
+
+  async resolvePublicAppointmentContext(
+    token: string,
+  ): Promise<PublicAppointmentContext> {
+    const record = await this.findPublicToken(token);
+
+    this.assertPublicTokenNotRevoked(record);
+    const timezone = this.publicTimezone(record);
+    if (record.request.status === BookingRequestStatus.BOOKED) {
+      return {
+        requestId: record.request.id,
+        artistId: record.request.artistId,
+        timezone,
+      };
+    }
+
+    await this.assertPendingPublicTokenActive(record);
+    throw appointmentNotFound();
   }
 
   private async findPublicToken(token: string): Promise<PublicTokenRecord> {

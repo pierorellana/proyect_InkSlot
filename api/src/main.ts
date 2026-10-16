@@ -1,4 +1,4 @@
-import { ValidationPipe } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
@@ -11,6 +11,13 @@ async function bootstrap() {
       transform: true,
       whitelist: true,
       forbidNonWhitelisted: true,
+      exceptionFactory: () =>
+        new BadRequestException({
+          error: {
+            code: 'BAD_REQUEST',
+            message: 'Los datos enviados no son válidos',
+          },
+        }),
     }),
   );
   await app.listen(process.env.PORT ?? 3000);

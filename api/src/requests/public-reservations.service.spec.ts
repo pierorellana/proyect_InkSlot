@@ -226,6 +226,30 @@ describe('BookingRequestsService public resolution', () => {
     );
   });
 
+  it('returns the safe booked appointment context even after token consumption', async () => {
+    const booked = record();
+    booked.request.status = BookingRequestStatus.BOOKED;
+    booked.consumedAt = now;
+    booked.expiresAt = new Date('2026-10-14T12:00:00.000Z');
+    bookingToken.findUnique.mockResolvedValue(booked);
+
+    await expect(
+      service.resolvePublicAppointmentContext(rawToken),
+    ).resolves.toEqual({
+      requestId,
+      artistId,
+      timezone: 'America/Guayaquil',
+    });
+  });
+
+  it('does not expose a pending request through appointment lookup context', async () => {
+    await expectCode(
+      service.resolvePublicAppointmentContext(rawToken),
+      'APPOINTMENT_NOT_FOUND',
+      404,
+    );
+  });
+
   it('keeps a booked result readable after token consumption and expiry', async () => {
     const booked = record();
     booked.request.status = BookingRequestStatus.BOOKED;
