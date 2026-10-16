@@ -266,21 +266,13 @@ class _ActiveBlock extends StatelessWidget {
                 live: true,
               ),
               const SizedBox(height: 12),
-              Text.rich(
-                TextSpan(
-                  text: '${reservation.artistDisplayName},\n',
-                  children: [
-                    TextSpan(
-                      text: 'tu espacio te espera.',
-                      style: inkSlotSerif(
-                        44,
-                        italic: true,
-                        color: const Color(0xFFCFC9BF),
-                      ),
-                    ),
-                  ],
+              Text(
+                'Tu espacio te espera.',
+                style: inkSlotSerif(
+                  44,
+                  italic: true,
+                  color: const Color(0xFFCFC9BF),
                 ),
-                style: inkSlotSerif(44),
               ),
             ],
           ),

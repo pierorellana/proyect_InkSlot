@@ -54,6 +54,7 @@ void main() {
 
     expect(find.byType(PublicWelcomePage), findsOneWidget);
     expect(find.text('SALTAR INTRO'), findsNothing);
+    expect(find.textContaining('Tu espacio te espera.'), findsOneWidget);
 
     await tester.tap(find.text('Elegir fecha y hora'));
     await tester.pumpAndSettle();
