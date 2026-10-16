@@ -155,12 +155,12 @@ class PublicConfirmationService {
 
 ```ts
 await tx.$queryRaw(
-  Prisma.sql`SELECT id FROM "booking_requests" WHERE id = ${requestId} FOR UPDATE`,
+  Prisma.sql`SELECT id FROM "booking_requests" WHERE id = CAST(${requestId} AS uuid) FOR UPDATE`,
 );
 ```
 
 Revalidate PENDING request/token, insert Appointment CONFIRMED/PENDING, update request to BOOKED with version increment, consume the token, create the outbox payload { appointmentId, operation: 'create' }, and persist IdempotencyKey with the exact 201-safe response.
-- [ ] Step 5: Wrap the complete transaction in two attempts. Retry only sqlState 40001 or 40P01, checking the error and error.cause. Map exclusion SQLSTATE 23P01 and appointment uniqueness conflicts to safe 409 errors.
+- [ ] Step 5: Wrap the complete transaction in three bounded attempts (two retries). Retry only sqlState 40001 or 40P01, checking the error and error.cause. Map exclusion SQLSTATE 23P01 and appointment uniqueness conflicts to safe 409 errors.
 - [ ] Step 6: Implement getAppointment through the safe booked context, load the appointment, lowercase status/syncStatus, and return only date/time/timezone fields. Return 404 APPOINTMENT_NOT_FOUND when absent.
 - [ ] Step 7: Register AppointmentsModule with RequestsModule and AvailabilityModule, add the public controller/service, and import it from AppModule.
 - [ ] Step 8: Run unit tests/build and commit.
