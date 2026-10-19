@@ -22,10 +22,11 @@ detrás del teclado virtual al enfocar los campos del login.
   identidad del estudio, Inicio, Enlaces, Citas, Agenda y Cerrar sesión.
 - El drawer se cierra al elegir una ruta, tocar el scrim o usar el botón de
   cierre. La ruta activa conserva el tratamiento cobre del rail.
-- La navegación administrativa usa una escala suave y escalonada, sin opacidad
-  ni desplazamiento. La transición de ruta escala de `.965` a `1` y los
-  bloques de pantalla de `.975` a `1`, compatible con
-  `MediaQuery.disableAnimations`. No se cambia la navegación pública.
+- La navegación administrativa reemplaza la ruta de forma inmediata mediante
+  `NoTransitionPage`. No se mantienen simultáneamente la pantalla anterior y
+  la nueva mediante una transición visual. Los wrappers de entrada de páginas
+  y componentes son estáticos: no aplican escala, opacidad, desplazamiento ni
+  rotación. No se cambia la navegación pública.
 - El documento Web declara fondo tinta y esquema de color oscuro en `html` y
   `body`, para que el viewport expuesto por el teclado de iOS no muestre
   blanco. El `Scaffold` del login continúa usando `resizeToAvoidBottomInset` y
@@ -48,21 +49,17 @@ detrás del teclado virtual al enfocar los campos del login.
 2. En escritorio monta el rail permanente.
 3. En móvil monta el encabezado y un drawer controlado por el shell.
 4. Una selección del drawer ejecuta la navegación GoRouter y cierra el drawer.
-5. La vista destino entra con la transición administrativa definida; el estado
-   de Provider y los filtros de cada controller se mantienen.
+5. La vista destino reemplaza la anterior sin transición; el estado de Provider
+   y los filtros de cada controller se mantienen.
 
 ## Transición
 
-La transición de rutas administrativas usa:
-
-- escala de `.965` a `1`, sin `SlideTransition`, `Transform.translate` ni
-  `Opacity`;
-- curva `InkSlotMotion.standard`;
-- duración de `420 ms` (reversa de `280 ms`);
-- escala escalonada de `.975` a `1` para los bloques internos, con pasos de
-  `55 ms`;
-- transición estática y componentes en escala final cuando
-  `disableAnimations` esté activo.
+Las rutas administrativas usan `NoTransitionPage`: duración de entrada y
+salida cero, sin `ScaleTransition`, `SlideTransition`, `Opacity` ni
+`Transform.translate`. `AdminScaleIn`, `AdminScaleRise`, `AdminTok` y
+`AdminChain` se conservan como wrappers compatibles con los call sites, pero
+renderizan directamente su hijo y no ejecutan animaciones de entrada. El
+drawer, los botones y los sheets conservan sus animaciones de interacción.
 
 El drawer tendrá una entrada lateral independiente, con scrim oscuro y una
 curva de hoja coherente con `InkSlotMotion.sheet`. No se añadirá WebGL ni una
@@ -76,7 +73,8 @@ dependencia de navegación nueva.
   botón hamburguesa y las opciones del drawer.
 - El drawer navega a cada ruta, marca la opción activa y permite cerrar sesión.
 - En viewport de escritorio se conserva el rail y no aparece el hamburguesa.
-- La transición respeta `disableAnimations` y no altera la ruta final.
+- La navegación reemplaza la vista sin apilar pantallas y no altera la ruta
+  final; los componentes de entrada permanecen estáticos.
 - `fvm flutter analyze`, pruebas admin/auth relacionadas y build Web pasan.
 
 ## Fuera de alcance
