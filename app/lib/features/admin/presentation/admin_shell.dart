@@ -6,7 +6,6 @@ import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_logo.dart';
 import '../../../core/widgets/inkslot_motion.dart';
-import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../auth/presentation/admin_session_controller.dart';
 
 class AdminShell extends StatelessWidget {
@@ -257,12 +256,6 @@ class _AdminDrawer extends StatelessWidget {
             selected: selected == _AdminDestination.agenda,
             onTap: () => _go(context, '/admin/agenda'),
           ),
-          const SizedBox(height: 20),
-          InkSlotPrimaryButton(
-            label: 'Nueva solicitud',
-            leading: const InkSlotIcon(InkSlotIcons.mas, size: 20),
-            onPressed: () => _go(context, '/admin/requests/new'),
-          ),
           const Spacer(),
           _UserTile(sessionController: sessionController),
           const SizedBox(height: 14),
@@ -407,12 +400,6 @@ class _AdminRail extends StatelessWidget {
             icon: InkSlotIcons.reloj,
             selected: selected == _AdminDestination.agenda,
             onTap: () => context.go('/admin/agenda'),
-          ),
-          const SizedBox(height: 24),
-          InkSlotPrimaryButton(
-            label: 'Nueva solicitud',
-            leading: const InkSlotIcon(InkSlotIcons.mas, size: 20),
-            onPressed: () => context.go('/admin/requests/new'),
           ),
           const Spacer(),
           _UserTile(sessionController: sessionController),

@@ -149,7 +149,9 @@ void main() {
     expect(find.byType(AdminDashboardPage), findsOneWidget);
 
     await openDrawer();
-    await tester.tap(find.text('Nueva solicitud').last);
+    await tester.tap(_press('Enlaces'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.bySemanticsLabel('Nueva solicitud'));
     await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,

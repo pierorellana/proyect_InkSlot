@@ -157,7 +157,6 @@ Inicio       /admin
 Enlaces      /admin/requests
 Citas        /admin/appointments
 Agenda       /admin/agenda
-Nueva solicitud /admin/requests/new
 Cerrar sesión sessionController.logout()
 ```
 
