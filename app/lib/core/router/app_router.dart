@@ -1,8 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
+import '../../core/theme/inkslot_tokens.dart';
 import '../../features/admin/presentation/admin_shell.dart';
 import '../../features/agenda/data/agenda_repository.dart';
 import '../../features/agenda/presentation/admin_agenda_page.dart';
@@ -156,27 +158,36 @@ abstract final class AppRouter {
           routes: [
             GoRoute(
               path: '/admin',
-              builder: (_, _) => ChangeNotifierProvider.value(
-                value: dashboard,
-                child: AdminDashboardPage(
-                  controller: dashboard,
-                  sessionController: session,
-                  requestsController: requests,
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: ChangeNotifierProvider.value(
+                  value: dashboard,
+                  child: AdminDashboardPage(
+                    controller: dashboard,
+                    sessionController: session,
+                    requestsController: requests,
+                  ),
                 ),
               ),
             ),
             GoRoute(
               path: '/admin/requests',
-              builder: (_, _) => ChangeNotifierProvider.value(
-                value: requests,
-                child: BookingRequestsPage(controller: requests),
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: ChangeNotifierProvider.value(
+                  value: requests,
+                  child: BookingRequestsPage(controller: requests),
+                ),
               ),
             ),
             GoRoute(
               path: '/admin/requests/new',
-              builder: (context, state) => ChangeNotifierProvider.value(
-                value: requests,
-                child: NewBookingRequestPage(controller: requests),
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: ChangeNotifierProvider.value(
+                  value: requests,
+                  child: NewBookingRequestPage(controller: requests),
+                ),
               ),
             ),
             GoRoute(
@@ -185,58 +196,108 @@ abstract final class AppRouter {
                   state.extra is LinkReadyData || state.extra is LinkReadyArgs
                   ? null
                   : '/admin/requests',
-              builder: (context, state) {
+              pageBuilder: (context, state) {
                 final extra = state.extra;
                 final args = extra is LinkReadyArgs
                     ? extra
                     : LinkReadyArgs(link: extra! as LinkReadyData);
-                return LinkReadyPage(
-                  link: args.link,
-                  clientName: args.clientName,
-                  durationMinutes: args.durationMinutes,
-                  onBack: () => context.go('/admin'),
+                return _adminPage(
+                  state: state,
+                  child: LinkReadyPage(
+                    link: args.link,
+                    clientName: args.clientName,
+                    durationMinutes: args.durationMinutes,
+                    onBack: () => context.go('/admin'),
+                  ),
                 );
               },
             ),
             GoRoute(
               path: '/admin/requests/:id',
-              builder: (_, state) => ChangeNotifierProvider.value(
-                value: requests,
-                child: BookingRequestDetailPage(
-                  controller: requests,
-                  requestId: state.pathParameters['id'] ?? '',
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: ChangeNotifierProvider.value(
+                  value: requests,
+                  child: BookingRequestDetailPage(
+                    controller: requests,
+                    requestId: state.pathParameters['id'] ?? '',
+                  ),
                 ),
               ),
             ),
             GoRoute(
               path: '/admin/appointments',
-              builder: (_, _) => ChangeNotifierProvider.value(
-                value: appointments,
-                child: AdminAppointmentsPage(controller: appointments),
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: ChangeNotifierProvider.value(
+                  value: appointments,
+                  child: AdminAppointmentsPage(controller: appointments),
+                ),
               ),
             ),
             GoRoute(
               path: '/admin/appointments/:id',
-              builder: (_, state) => AdminAppointmentDetailPage(
-                controller: appointmentDetail,
-                appointmentId: state.pathParameters['id'] ?? '',
-                onChanged: () => appointments.load(refresh: true),
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: AdminAppointmentDetailPage(
+                  controller: appointmentDetail,
+                  appointmentId: state.pathParameters['id'] ?? '',
+                  onChanged: () => appointments.load(refresh: true),
+                ),
               ),
             ),
             GoRoute(
               path: '/admin/agenda',
-              builder: (_, _) => AdminAgendaPage(controller: agenda),
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: AdminAgendaPage(controller: agenda),
+              ),
             ),
             GoRoute(
               path: '/admin/sync-issues',
-              builder: (_, _) => ChangeNotifierProvider.value(
-                value: syncIssues,
-                child: SyncIssuesPage(controller: syncIssues),
+              pageBuilder: (_, state) => _adminPage(
+                state: state,
+                child: ChangeNotifierProvider.value(
+                  value: syncIssues,
+                  child: SyncIssuesPage(controller: syncIssues),
+                ),
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  static Page<void> _adminPage({
+    required GoRouterState state,
+    required Widget child,
+  }) {
+    return CustomTransitionPage<void>(
+      key: state.pageKey,
+      transitionDuration: InkSlotMotion.screen,
+      reverseTransitionDuration: const Duration(milliseconds: 260),
+      child: child,
+      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+        if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
+          return child;
+        }
+
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: InkSlotMotion.standard,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(.025, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
+        );
+      },
     );
   }
 
