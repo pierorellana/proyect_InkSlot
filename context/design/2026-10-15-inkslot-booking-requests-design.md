@@ -121,7 +121,7 @@ El token opaco se entrega únicamente en la respuesta de creación o renovación
 
 ### Listado y detalle
 
-El listado devuelve como máximo 20 elementos, ordenados por `createdAt DESC, id DESC`. `cursor` es una cadena base64url opaca que contiene la posición `(createdAt,id)`; la respuesta incluye `nextCursor` o `null`. El filtro `status` acepta los cinco estados de `BookingRequestStatus` en minúsculas.
+El listado devuelve como máximo 20 elementos, ordenados por `createdAt DESC, id DESC`. `cursor` es una cadena base64url opaca que contiene la posición `(createdAt,id)`; la respuesta incluye `nextCursor` o `null`. El filtro `status` acepta los cinco estados de `BookingRequestStatus` en minúsculas. Cada proyección administrativa incluye `linkExpiresAt`, la fecha ISO del token activo actual o `null`; así Inicio puede mostrar la vigencia real después de una renovación sin derivarla de `createdAt`.
 
 El detalle incluye los metadatos de solicitud, cliente propio, estado de enlace vigente y auditoría necesaria para la pantalla administrativa, pero nunca el token claro.
 

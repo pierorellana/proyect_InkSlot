@@ -12,6 +12,22 @@ import 'package:inkslot_app/features/dashboard/presentation/admin_dashboard_cont
 import 'package:inkslot_app/features/dashboard/presentation/admin_dashboard_page.dart';
 
 void main() {
+  test(
+    'calculates remaining hours from the active booking link expiration',
+    () {
+      final now = DateTime.utc(2026, 10, 19, 12);
+
+      expect(
+        remainingBookingLinkHours(DateTime.utc(2026, 10, 20, 12), now: now),
+        24,
+      );
+      expect(
+        remainingBookingLinkHours(DateTime.utc(2026, 10, 19, 11), now: now),
+        0,
+      );
+    },
+  );
+
   testWidgets('renders dashboard KPIs and upcoming appointments', (
     tester,
   ) async {

@@ -11,6 +11,7 @@ void main() {
     expect(request.client.contactValue, '@ink.client');
     expect(request.client.email, isNull);
     expect(request.paymentReference, 'transfer-123');
+    expect(request.linkExpiresAt, DateTime.utc(2026, 10, 21, 12));
     expect(request.minDate, DateTime.utc(2026, 10, 20));
     expect(request.createdAt.isUtc, isTrue);
   });
@@ -83,6 +84,7 @@ Map<String, dynamic> _requestJson() => {
     'contactValue': '@ink.client',
   },
   'paymentReference': 'transfer-123',
+  'linkExpiresAt': '2026-10-21T12:00:00Z',
   'depositVerified': true,
   'durationMinutes': 120,
   'status': 'pending',

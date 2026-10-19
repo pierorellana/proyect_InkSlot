@@ -68,6 +68,7 @@ class BookingRequest {
     required this.allowedWeekdays,
     required this.allowedWindows,
     required this.createdAt,
+    this.linkExpiresAt,
   });
 
   final String id;
@@ -81,6 +82,7 @@ class BookingRequest {
   final List<int>? allowedWeekdays;
   final List<BookingRestrictionWindow>? allowedWindows;
   final DateTime createdAt;
+  final DateTime? linkExpiresAt;
 
   factory BookingRequest.fromJson(Map<String, dynamic> json) {
     return BookingRequest(
@@ -95,6 +97,7 @@ class BookingRequest {
       allowedWeekdays: _nullableIntList(json, 'allowedWeekdays'),
       allowedWindows: _nullableWindowList(json, 'allowedWindows'),
       createdAt: _requiredDate(json, 'createdAt'),
+      linkExpiresAt: _nullableDate(json, 'linkExpiresAt'),
     );
   }
 }

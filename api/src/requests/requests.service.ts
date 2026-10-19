@@ -41,6 +41,13 @@ type BookingRequestWithTokens = Prisma.BookingRequestGetPayload<{
   include: { client: true; tokens: true };
 }>;
 
+type BookingTokenLinkProjection = {
+  expiresAt: Date;
+  revokedAt: Date | null;
+  consumedAt: Date | null;
+  createdAt: Date;
+};
+
 type PublicTokenRecord = Prisma.BookingTokenGetPayload<{
   include: {
     request: {
@@ -89,6 +96,7 @@ export type BookingRequestResponse = {
   allowedWeekdays: number[] | null;
   allowedWindows: Array<{ startLocal: string; endLocal: string }> | null;
   createdAt: string;
+  linkExpiresAt: string | null;
 };
 
 export type BookingRequestLink = {
@@ -256,7 +264,7 @@ export class BookingRequestsService {
       });
 
       return {
-        request: this.toResponse(request),
+        request: this.toResponse(request, expiresAt),
         link: {
           path: `/r/${generated.token}`,
           expiresAt: expiresAt.toISOString(),
@@ -299,7 +307,17 @@ export class BookingRequestsService {
 
       const rows = await this.prisma.bookingRequest.findMany({
         where,
-        include: { client: true },
+        include: {
+          client: true,
+          tokens: {
+            select: {
+              expiresAt: true,
+              revokedAt: true,
+              consumedAt: true,
+              createdAt: true,
+            },
+          },
+        },
         orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
         take: BOOKING_REQUEST_PAGE_SIZE + 1,
       });
@@ -310,7 +328,9 @@ export class BookingRequestsService {
       const last = page.at(-1);
 
       return {
-        items: page.map((row) => this.toResponse(row)),
+        items: page.map((row) =>
+          this.toResponse(row, this.activeLinkExpiresAt(row.tokens)),
+        ),
         nextCursor:
           hasNextPage && last
             ? encodeBookingCursor({ createdAt: last.createdAt, id: last.id })
@@ -352,7 +372,10 @@ export class BookingRequestsService {
       });
 
       return {
-        request: this.toResponse(request),
+        request: this.toResponse(
+          request,
+          this.activeLinkExpiresAt(request.tokens),
+        ),
         currentLink: this.currentLink(request),
         audit: audit.map((entry) => ({
           action: entry.action,
@@ -414,7 +437,7 @@ export class BookingRequestsService {
       });
 
       return {
-        request: this.toResponse(updated),
+        request: this.toResponse(updated, expiresAt),
         link: {
           path: `/r/${generated.token}`,
           expiresAt: expiresAt.toISOString(),
@@ -936,6 +959,7 @@ export class BookingRequestsService {
 
   private toResponse(
     request: BookingRequestWithClient,
+    linkExpiresAt: Date | null = null,
   ): BookingRequestResponse {
     return {
       id: request.id,
@@ -956,7 +980,24 @@ export class BookingRequestsService {
       allowedWeekdays: this.jsonArray(request.allowedWeekdays),
       allowedWindows: this.jsonWindows(request.allowedWindows),
       createdAt: request.createdAt.toISOString(),
+      linkExpiresAt: linkExpiresAt?.toISOString() ?? null,
     };
+  }
+
+  private activeLinkExpiresAt(
+    tokens: BookingTokenLinkProjection[],
+  ): Date | null {
+    const active = [...tokens]
+      .filter(
+        (token) =>
+          token.revokedAt === null &&
+          token.consumedAt === null &&
+          token.expiresAt.getTime() > Date.now(),
+      )
+      .sort(
+        (left, right) => right.createdAt.getTime() - left.createdAt.getTime(),
+      )[0];
+    return active?.expiresAt ?? null;
   }
 
   private jsonArray(value: Prisma.JsonValue | null): number[] | null {

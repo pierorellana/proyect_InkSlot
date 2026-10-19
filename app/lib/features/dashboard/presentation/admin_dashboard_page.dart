@@ -21,6 +21,12 @@ import 'admin_dashboard_controller.dart';
 /// Vigencia de referencia del enlace (`48 h`) para el anillo de "Por agendar".
 const _referenceLinkHours = 48;
 
+int remainingBookingLinkHours(DateTime? expiresAt, {DateTime? now}) {
+  if (expiresAt == null) return 0;
+  final remaining = expiresAt.difference(now ?? DateTime.now());
+  return math.max(0, (remaining.inSeconds / 3600).ceil());
+}
+
 class AdminDashboardPage extends StatefulWidget {
   const AdminDashboardPage({
     required this.controller,
@@ -342,11 +348,7 @@ class _PendingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hoursLeft =
-        (_referenceLinkHours -
-                DateTime.now().difference(request.createdAt).inMinutes / 60)
-            .ceil()
-            .clamp(0, _referenceLinkHours);
+    final hoursLeft = remainingBookingLinkHours(request.linkExpiresAt);
     final channel = request.client.contactChannel;
     return InkSlotPress(
       onTap: () => context.go('/admin/requests/${request.id}'),

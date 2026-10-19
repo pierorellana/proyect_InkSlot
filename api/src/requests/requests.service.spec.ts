@@ -544,6 +544,14 @@ describe('BookingRequestsService administration', () => {
     });
   });
 
+  it('projects the current active link expiration in list responses', async () => {
+    const result = await service.list(artistId, { status: 'pending' });
+
+    expect(
+      (result.items[0] as unknown as { linkExpiresAt?: string }).linkExpiresAt,
+    ).toBe('2026-10-17T12:00:00.000Z');
+  });
+
   it('rejects invalid cursor and status safely', async () => {
     await expectCode(
       service.list(artistId, { cursor: 'invalid' }),

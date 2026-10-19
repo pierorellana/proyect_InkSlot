@@ -389,6 +389,17 @@ describe('booking request lifecycle', () => {
       .expect(200);
     expect((newPublic.body as PublicResponse).status).toBe('pending');
 
+    const listed = await request(app.getHttpServer())
+      .get(`/v1/admin/booking-requests?status=pending`)
+      .set('Cookie', cookies)
+      .expect(200);
+    const listedRequest = (listed.body as ListResponse).items.find(
+      (item) => item.id === created.response.request.id,
+    );
+    expect(listedRequest).toMatchObject({
+      linkExpiresAt: renewedBody.link.expiresAt,
+    });
+
     const tokenRows = await prisma.bookingToken.findMany({
       where: { requestId: created.response.request.id },
       orderBy: { createdAt: 'asc' },
