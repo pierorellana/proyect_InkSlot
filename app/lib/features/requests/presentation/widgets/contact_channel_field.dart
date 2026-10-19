@@ -5,6 +5,11 @@ import '../../domain/booking_request_status.dart';
 
 /// Canal de contacto (`.seg`) y dato de contacto (`.fld`).
 class ContactChannelField extends StatelessWidget {
+  static const _availableChannels = <ContactChannel>[
+    ContactChannel.whatsapp,
+    ContactChannel.email,
+  ];
+
   const ContactChannelField({
     required this.channel,
     required this.controller,
@@ -40,32 +45,37 @@ class ContactChannelField extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      Semantics(
-        container: true,
-        label: 'Canal de contacto',
-        child: InkSlotSegmented(
-          labels: [for (final value in ContactChannel.values) value.label],
-          selected: ContactChannel.values.indexOf(channel),
-          onChanged: (index) {
-            if (enabled) onChannelChanged(ContactChannel.values[index]);
-          },
+  Widget build(BuildContext context) {
+    final visibleChannel = _availableChannels.contains(channel)
+        ? channel
+        : ContactChannel.whatsapp;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Semantics(
+          container: true,
+          label: 'Canal de contacto',
+          child: InkSlotSegmented(
+            labels: [for (final value in _availableChannels) value.label],
+            selected: _availableChannels.indexOf(visibleChannel),
+            onChanged: (index) {
+              if (enabled) onChannelChanged(_availableChannels[index]);
+            },
+          ),
         ),
-      ),
-      const SizedBox(height: 14),
-      InkSlotField(
-        label: channel.valueLabel,
-        controller: controller,
-        hint: channel.hint,
-        keyboardType: channel.keyboardType,
-        textInputAction: TextInputAction.next,
-        errorText: errorText,
-        onChanged: onChanged,
-      ),
-    ],
-  );
+        const SizedBox(height: 14),
+        InkSlotField(
+          label: visibleChannel.valueLabel,
+          controller: controller,
+          hint: visibleChannel.hint,
+          keyboardType: visibleChannel.keyboardType,
+          textInputAction: TextInputAction.next,
+          errorText: errorText,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
 }
 
 extension on ContactChannel {

@@ -133,7 +133,7 @@ void main() {
     },
   );
 
-  testWidgets('supports all contact channels and channel-specific labels', (
+  testWidgets('supports the available contact channels and labels', (
     tester,
   ) async {
     usePhoneView(tester);
@@ -148,13 +148,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Número de WhatsApp'), findsOneWidget);
-    await tester.tap(find.text('Instagram'));
+    expect(find.text('WhatsApp'), findsOneWidget);
+    expect(find.text('Correo'), findsOneWidget);
+    expect(find.text('Instagram'), findsNothing);
+    expect(find.text('Teléfono'), findsNothing);
+    await tester.tap(find.text('Correo'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Usuario de Instagram'), findsOneWidget);
-    expect(find.text('@usuario'), findsOneWidget);
-    expect(find.text('Correo'), findsOneWidget);
-    expect(find.text('Teléfono'), findsOneWidget);
+    expect(find.text('Correo electrónico'), findsOneWidget);
+    expect(find.text('cliente@correo.com'), findsOneWidget);
   });
 
   testWidgets('adjusts the duration in 30 minute steps', (tester) async {
