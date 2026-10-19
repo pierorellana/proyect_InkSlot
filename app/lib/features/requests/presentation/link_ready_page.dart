@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/inkslot_tokens.dart';
+import '../../../core/utils/external_link.dart';
 import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
@@ -26,6 +27,43 @@ class LinkReadyArgs {
   final String? clientName;
   final int? durationMinutes;
 }
+
+String buildBookingShareMessage({
+  required String url,
+  required String? clientName,
+  required int? durationMinutes,
+  required int validityHours,
+}) {
+  final trimmedName = clientName?.trim() ?? '';
+  final firstName = trimmedName.isEmpty
+      ? 'cliente'
+      : trimmedName.split(RegExp(r'\s+')).first;
+  final duration = durationMinutes == null
+      ? null
+      : durationLabel(durationMinutes);
+
+  return [
+    'Hola, $firstName 👋',
+    '',
+    'Te comparto tu enlace privado para reservar tu cita.',
+    '',
+    url,
+    '',
+    if (duration == null)
+      'Desde este enlace podrás elegir la fecha y hora que mejor te convenga.'
+    else
+      'Desde este enlace podrás elegir la fecha y hora que mejor te convenga '
+          'para tu sesión de $duration.',
+    '',
+    'El enlace es de un solo uso y estará disponible durante $validityHours h.',
+    '',
+    'Si tienes alguna duda, escríbeme por este medio.',
+    '',
+    '¡Nos vemos!',
+  ].join('\n');
+}
+
+enum _ShareDestination { whatsapp, more }
 
 class LinkReadyPage extends StatefulWidget {
   const LinkReadyPage({
@@ -66,6 +104,23 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
     return name.isEmpty ? null : name.split(RegExp(r'\s+')).first;
   }
 
+  int get _validityHours =>
+      (widget.link.expiresAt.difference(DateTime.now()).inMinutes / 60)
+          .round()
+          .clamp(0, 9999)
+          .toInt();
+
+  String get _shareMessage => buildBookingShareMessage(
+    url: _url,
+    clientName: widget.clientName,
+    durationMinutes: widget.durationMinutes,
+    validityHours: _validityHours,
+  );
+
+  String get _whatsappUrl => Uri.https('wa.me', '/', <String, String>{
+    'text': _shareMessage,
+  }).toString();
+
   @override
   void dispose() {
     _copiedTimer?.cancel();
@@ -89,7 +144,9 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
 
   Future<void> _share() async {
     try {
-      final result = await SharePlus.instance.share(ShareParams(text: _url));
+      final result = await SharePlus.instance.share(
+        ShareParams(text: _shareMessage),
+      );
       if (!mounted) return;
       if (result.status == ShareResultStatus.unavailable) {
         showInkSlotToast(
@@ -111,16 +168,32 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
     }
   }
 
+  Future<void> _shareViaWhatsApp() async {
+    final opened = await openExternalLink(_whatsappUrl);
+    if (!mounted) return;
+    showInkSlotToast(
+      context,
+      opened ? 'WhatsApp listo para enviar' : 'No se pudo abrir WhatsApp',
+      icon: opened ? InkSlotIcons.check : InkSlotIcons.alerta,
+    );
+  }
+
   Future<void> _openShareSheet() async {
     final first = _firstName;
-    final pick = await showInkSlotSheet<bool>(
+    final destination = await showInkSlotSheet<_ShareDestination>(
       context: context,
       builder: (sheetContext) => _ShareSheet(
         title: first == null ? 'Compartir enlace' : 'Compartir con $first',
-        onPick: () => Navigator.of(sheetContext).pop(true),
+        onPick: (value) => Navigator.of(sheetContext).pop(value),
       ),
     );
-    if (pick == true && mounted) await _share();
+    if (!mounted || destination == null) return;
+    switch (destination) {
+      case _ShareDestination.whatsapp:
+        await _shareViaWhatsApp();
+      case _ShareDestination.more:
+        await _share();
+    }
   }
 
   String get _validity {
@@ -289,7 +362,7 @@ class _ShareSheet extends StatelessWidget {
   const _ShareSheet({required this.title, required this.onPick});
 
   final String title;
-  final VoidCallback onPick;
+  final ValueChanged<_ShareDestination> onPick;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -315,15 +388,7 @@ class _ShareSheet extends StatelessWidget {
             child: _ShareOption(
               icon: InkSlotIcons.mensaje,
               label: 'WhatsApp',
-              onTap: onPick,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _ShareOption(
-              icon: InkSlotIcons.camaraSocial,
-              label: 'Instagram',
-              onTap: onPick,
+              onTap: () => onPick(_ShareDestination.whatsapp),
             ),
           ),
           const SizedBox(width: 10),
@@ -331,7 +396,7 @@ class _ShareSheet extends StatelessWidget {
             child: _ShareOption(
               icon: InkSlotIcons.compartir,
               label: 'Más',
-              onTap: onPick,
+              onTap: () => onPick(_ShareDestination.more),
             ),
           ),
         ],

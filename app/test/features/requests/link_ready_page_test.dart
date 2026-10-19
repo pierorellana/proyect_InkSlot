@@ -22,6 +22,24 @@ void main() {
     addTearDown(tester.view.reset);
   }
 
+  test('builds a professional booking message with the approved copy', () {
+    final message = buildBookingShareMessage(
+      url: 'https://example.test/#/r/secret-token',
+      clientName: 'Daniela Mora',
+      durationMinutes: 180,
+      validityHours: 48,
+    );
+
+    expect(message, contains('Hola, Daniela 👋'));
+    expect(
+      message,
+      contains('Te comparto tu enlace privado para reservar tu cita.'),
+    );
+    expect(message, contains('https://example.test/#/r/secret-token'));
+    expect(message, contains('para tu sesión de 3 h.'));
+    expect(message, contains('disponible durante 48 h.'));
+  });
+
   testWidgets('shows, copies, and shares the ephemeral link', (tester) async {
     usePhoneView(tester);
     final copied = <Object?>[];
@@ -72,8 +90,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Compartir con Daniela'), findsOneWidget);
     expect(find.text('WhatsApp'), findsOneWidget);
-    expect(find.text('Instagram'), findsOneWidget);
     expect(find.text('Más'), findsOneWidget);
+    expect(find.text('Instagram'), findsNothing);
 
     await tester.pump(const Duration(seconds: 4));
   });
