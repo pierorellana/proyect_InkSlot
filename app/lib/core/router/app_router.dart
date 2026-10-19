@@ -287,15 +287,12 @@ abstract final class AppRouter {
           parent: animation,
           curve: InkSlotMotion.standard,
         );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(.025, 0),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
+        return SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(.08, 0),
+            end: Offset.zero,
+          ).animate(curved),
+          child: child,
         );
       },
     );

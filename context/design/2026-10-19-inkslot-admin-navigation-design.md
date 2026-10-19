@@ -22,9 +22,10 @@ detrás del teclado virtual al enfocar los campos del login.
   identidad del estudio, Inicio, Enlaces, Citas, Agenda y Cerrar sesión.
 - El drawer se cierra al elegir una ruta, tocar el scrim o usar el botón de
   cierre. La ruta activa conserva el tratamiento cobre del rail.
-- La navegación administrativa usa una transición de `fade + slide` sutil,
-  compatible con `MediaQuery.disableAnimations`. No se cambia la navegación
-  pública ni se duplican animaciones internas existentes más de lo necesario.
+- La navegación administrativa usa un desplazamiento horizontal puro desde la
+  derecha, compatible con `MediaQuery.disableAnimations` y sin desvanecido en
+  la transición del router. No se cambia la navegación pública ni se duplican
+  animaciones internas existentes más de lo necesario.
 - El documento Web declara fondo tinta y esquema de color oscuro en `html` y
   `body`, para que el viewport expuesto por el teclado de iOS no muestre
   blanco. El `Scaffold` del login continúa usando `resizeToAvoidBottomInset` y
@@ -52,10 +53,9 @@ detrás del teclado virtual al enfocar los campos del login.
 
 ## Transición
 
-La transición de rutas administrativas combinará:
+La transición de rutas administrativas usará:
 
-- opacidad de `0` a `1`;
-- desplazamiento horizontal leve, aproximadamente `16 px`;
+- desplazamiento horizontal desde la derecha, aproximadamente `8%` del ancho;
 - curva `InkSlotMotion.standard`;
 - duración aproximada de `360–450 ms`;
 - duración cero o transición estática cuando `disableAnimations` esté activo.

@@ -227,15 +227,12 @@ Page<void> _adminPage({
       parent: animation,
       curve: InkSlotMotion.standard,
     );
-    return FadeTransition(
-      opacity: curved,
-      child: SlideTransition(
-        position: Tween<Offset>(
-          begin: const Offset(.025, 0),
-          end: Offset.zero,
-        ).animate(curved),
-        child: child,
-      ),
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(.08, 0),
+        end: Offset.zero,
+      ).animate(curved),
+      child: child,
     );
   },
 );
@@ -298,6 +295,8 @@ changes must remain unstaged and uncommitted.
 - Build Web con `API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1`: aprobado.
 - Ajuste posterior: el fondo del documento Web usa `#0A0A0B`, igual que
   `InkSlotColors.ink`, para eliminar el contraste con las pantallas.
+- Ajuste posterior: la transición admin usa desplazamiento horizontal puro
+  desde la derecha; se eliminó `FadeTransition` por decisión visual.
 - La suite completa alcanzó 194 pruebas, pero conserva fallos fuera de este
   slice en `admin_appointment_detail_test.dart`,
   `new_booking_request_page_test.dart` y snapshots de booking; no se alteraron
