@@ -10,6 +10,7 @@ import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../admin/presentation/admin_date_format.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
 
@@ -138,7 +139,7 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
+    final topInset = adminPageTopInset(context);
     final first = _firstName;
     return ColoredBox(
       color: InkSlotColors.ink,

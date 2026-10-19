@@ -9,6 +9,7 @@ import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../admin/presentation/admin_date_format.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../../auth/presentation/admin_session_controller.dart';
 import '../../requests/domain/booking_request.dart';
@@ -71,9 +72,7 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final isDesktop = media.size.width >= 860;
-    final topInset = isDesktop
-        ? (media.padding.top < 58 ? 58.0 : media.padding.top)
-        : 0.0;
+    final topInset = isDesktop ? adminPageTopInset(context) : 0.0;
     return AdminScaleIn(
       duration: const Duration(milliseconds: 550),
       child: AnimatedBuilder(

@@ -9,6 +9,7 @@ import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../../core/widgets/inkslot_state_block.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
 import '../domain/booking_request_status.dart';
@@ -135,7 +136,7 @@ class _DetailScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = MediaQuery.paddingOf(context).top;
+    final top = adminPageTopInset(context);
     return AdminScaleIn(
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(20, top < 58 ? 58 : top, 20, 120),

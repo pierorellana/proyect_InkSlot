@@ -7,6 +7,7 @@ import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
 import '../domain/booking_request_status.dart';
@@ -111,8 +112,7 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
-    final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
+    final topInset = adminPageTopInset(context);
     return AdminScaleIn(
       child: Column(
         children: [

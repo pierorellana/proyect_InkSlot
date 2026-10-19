@@ -6,6 +6,7 @@ import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_state_block.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/admin_appointment.dart';
 import 'admin_appointments_controller.dart';
@@ -55,8 +56,7 @@ class _AdminAppointmentsPageState extends State<AdminAppointmentsPage> {
       final initialLoading = loading && !hasItems;
       final items = controller.items;
 
-      final media = MediaQuery.of(context);
-      final top = media.padding.top < 58 ? 58.0 : media.padding.top;
+      final top = adminPageTopInset(context);
       return AdminScaleIn(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, top, 20, 120),

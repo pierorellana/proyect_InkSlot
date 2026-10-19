@@ -6,6 +6,7 @@ import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/sync_issue.dart';
 import 'sync_issues_controller.dart';
@@ -41,7 +42,7 @@ class _SyncIssuesPageState extends State<SyncIssuesPage> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
+    final topInset = adminPageTopInset(context);
     return AdminScaleIn(
       duration: const Duration(milliseconds: 550),
       child: AnimatedBuilder(

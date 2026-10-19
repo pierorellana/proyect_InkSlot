@@ -7,6 +7,7 @@ import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../../core/widgets/inkslot_state_block.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/admin_appointment.dart';
 import 'admin_appointment_detail_controller.dart';
@@ -102,7 +103,7 @@ class _AdminAppointmentDetailPageState
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final top = media.padding.top < 58 ? 58.0 : media.padding.top;
+    final top = adminPageTopInset(context);
     return AdminScaleIn(
       child: AnimatedBuilder(
         animation: controller,

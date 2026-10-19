@@ -5,6 +5,7 @@ import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_state_block.dart';
+import '../../admin/presentation/admin_layout.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
 import '../domain/booking_request_status.dart';
@@ -51,7 +52,7 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
       final initialLoading = loading && !hasItems;
       final filter = controller.filter;
       void reload() => controller.load(refresh: true, status: filter.apiStatus);
-      final top = MediaQuery.paddingOf(context).top;
+      final top = adminPageTopInset(context);
       return AdminScaleIn(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, top < 58 ? 58 : top, 20, 120),
