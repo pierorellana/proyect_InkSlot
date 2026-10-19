@@ -142,10 +142,8 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
     final first = _firstName;
     return ColoredBox(
       color: InkSlotColors.ink,
-      child: InkSlotScreenIn(
+      child: AdminScaleIn(
         duration: const Duration(milliseconds: 550),
-        offset: 14,
-        fromScale: 1,
         child: CustomScrollView(
           slivers: [
             SliverFillRemaining(
@@ -197,20 +195,18 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    InkSlotRise(
+                    AdminScaleRise(
                       delay: const Duration(milliseconds: 120),
                       duration: const Duration(milliseconds: 650),
-                      offset: 16,
                       child: Text(
                         'SOLICITUD CREADA · PENDIENTE DE AGENDAR',
                         style: inkSlotMono(color: InkSlotColors.successText),
                       ),
                     ),
                     const SizedBox(height: 10),
-                    InkSlotRise(
+                    AdminScaleRise(
                       delay: const Duration(milliseconds: 180),
                       duration: const Duration(milliseconds: 650),
-                      offset: 16,
                       child: Text.rich(
                         TextSpan(
                           children: [
@@ -227,10 +223,9 @@ class _LinkReadyPageState extends State<LinkReadyPage> {
                       ),
                     ),
                     const SizedBox(height: 26),
-                    InkSlotRise(
+                    AdminScaleRise(
                       delay: const Duration(milliseconds: 240),
                       duration: const Duration(milliseconds: 650),
-                      offset: 16,
                       child: InkSlotCard(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 20,

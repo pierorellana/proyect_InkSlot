@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
-import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_state_block.dart';
+import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
 import '../domain/booking_request_status.dart';
 import 'booking_requests_controller.dart';
@@ -52,7 +52,7 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
       final filter = controller.filter;
       void reload() => controller.load(refresh: true, status: filter.apiStatus);
       final top = MediaQuery.paddingOf(context).top;
-      return InkSlotScreenIn(
+      return AdminScaleIn(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, top < 58 ? 58 : top, 20, 120),
           child: Align(
@@ -62,14 +62,14 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  InkSlotRise.step(
+                  AdminScaleRise.step(
                     0,
                     child: _Header(
                       onCreate: () => context.go('/admin/requests/new'),
                     ),
                   ),
                   const SizedBox(height: 18),
-                  InkSlotRise.step(
+                  AdminScaleRise.step(
                     1,
                     child: _FilterBar(
                       selected: filter,
@@ -121,7 +121,7 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
                       ),
                       const SizedBox(height: 14),
                     ],
-                    InkSlotRise.step(
+                    AdminScaleRise.step(
                       2,
                       child: InkSlotCard(
                         child: Column(

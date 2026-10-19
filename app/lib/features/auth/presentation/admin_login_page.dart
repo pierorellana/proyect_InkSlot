@@ -4,6 +4,7 @@ import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../admin/presentation/admin_motion.dart';
 import 'admin_session_controller.dart';
 import 'widgets/d_coin.dart';
 
@@ -85,10 +86,8 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                 final side = constraints.maxWidth > 488
                     ? (constraints.maxWidth - 440) / 2
                     : 24.0;
-                return InkSlotScreenIn(
+                return AdminScaleIn(
                   duration: const Duration(milliseconds: 550),
-                  offset: 14,
-                  fromScale: 1,
                   child: CustomScrollView(
                     slivers: [
                       SliverFillRemaining(
@@ -154,10 +153,9 @@ class _LoginContent extends StatelessWidget {
         children: [
           const Center(child: DCoin()),
           const SizedBox(height: 34),
-          InkSlotRise(
+          AdminScaleRise(
             delay: const Duration(milliseconds: 60),
             duration: const Duration(milliseconds: 650),
-            offset: 16,
             child: Column(
               children: [
                 Text(
@@ -185,10 +183,9 @@ class _LoginContent extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 36),
-          InkSlotRise(
+          AdminScaleRise(
             delay: const Duration(milliseconds: 120),
             duration: const Duration(milliseconds: 650),
-            offset: 16,
             child: _Shake(
               trigger: shakes,
               child: Column(

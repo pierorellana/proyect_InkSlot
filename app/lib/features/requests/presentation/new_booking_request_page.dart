@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
-import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
@@ -114,7 +113,7 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
-    return AdminUpIn(
+    return AdminScaleIn(
       child: Stack(
         children: [
           Positioned.fill(
@@ -286,9 +285,8 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
             ],
           ),
           if (_hasRestrictions)
-            InkSlotRise(
+            AdminScaleRise(
               duration: const Duration(milliseconds: 650),
-              offset: 16,
               child: Padding(
                 padding: const EdgeInsets.only(top: 16),
                 child: Column(

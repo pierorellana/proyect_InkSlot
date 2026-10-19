@@ -9,6 +9,7 @@ import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../../core/widgets/inkslot_state_block.dart';
+import '../../admin/presentation/admin_motion.dart';
 import '../domain/booking_request.dart';
 import '../domain/booking_request_status.dart';
 import 'booking_requests_controller.dart';
@@ -135,7 +136,7 @@ class _DetailScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
-    return InkSlotScreenIn(
+    return AdminScaleIn(
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(20, top < 58 ? 58 : top, 20, 120),
         child: Align(
@@ -201,7 +202,7 @@ class _DetailContent extends StatelessWidget {
       onBack: onBack,
       status: status,
       children: [
-        InkSlotRise.step(
+        AdminScaleRise.step(
           0,
           child: Padding(
             padding: const EdgeInsets.only(top: 22),
@@ -226,7 +227,7 @@ class _DetailContent extends StatelessWidget {
           _MutationError(message: mutationError!),
         ],
         if (linkActive)
-          InkSlotRise.step(
+          AdminScaleRise.step(
             1,
             child: _ActiveLinkCard(
               link: link!,
@@ -236,7 +237,7 @@ class _DetailContent extends StatelessWidget {
             ),
           ),
         if (linkDead)
-          InkSlotRise.step(
+          AdminScaleRise.step(
             1,
             child: _DeadLinkCard(
               revoked: link?.status == BookingLinkStatus.revoked,
@@ -245,8 +246,8 @@ class _DetailContent extends StatelessWidget {
             ),
           ),
         if (status == BookingRequestStatus.booked)
-          InkSlotRise.step(1, child: const _BookedCard()),
-        InkSlotRise.step(
+          AdminScaleRise.step(1, child: const _BookedCard()),
+        AdminScaleRise.step(
           2,
           child: Padding(
             padding: const EdgeInsets.only(top: 14),

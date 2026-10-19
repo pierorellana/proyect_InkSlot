@@ -2,9 +2,9 @@
 
 > **For agentic workers:** Execute the tasks in order, preserving the existing SDD and using a focused commit after each independently verified slice.
 
-**Goal:** Fix the white iOS Web keyboard backdrop, replace mobile admin bottom navigation with a hamburger drawer, and add a subtle accessible transition between admin routes.
+**Goal:** Fix the white iOS Web keyboard backdrop, replace mobile admin bottom navigation with a hamburger drawer, and add a subtle accessible scale-only transition between admin routes.
 
-**Architecture:** Keep the current `AdminShell` as the single responsive navigation boundary. Move the mobile presentation from a bottom tab bar to a shell-level header plus Flutter `Scaffold.drawer`; keep the desktop rail unchanged. Use `CustomTransitionPage` only for admin routes, while preserving Provider controllers and existing page-level animations.
+**Architecture:** Keep the current `AdminShell` as the single responsive navigation boundary. Move the mobile presentation from a bottom tab bar to a shell-level header plus Flutter `Scaffold.drawer`; keep the desktop rail unchanged. Use `CustomTransitionPage` only for admin routes, with scale-only entrance wrappers for admin pages and components while preserving Provider controllers.
 
 **Tech Stack:** Flutter Web 3.47.5 through FVM, Provider, GoRouter, existing InkSlot tokens/widgets, Flutter Web HTML/CSS.
 
@@ -186,7 +186,7 @@ git add app/lib/features/admin/presentation/admin_shell.dart app/lib/features/da
 git commit -m "feat(app): add mobile admin navigation drawer"
 ```
 
-### Task 3: Add accessible admin route transitions
+### Task 3: Add accessible scale-only admin route transitions
 
 **Files:**
 - Modify: `app/lib/core/router/app_router.dart`.
@@ -194,7 +194,7 @@ git commit -m "feat(app): add mobile admin navigation drawer"
 
 **Interfaces:**
 - Consumes: existing admin route builders and `InkSlotMotion.standard`.
-- Produces: `_adminPage` returning `CustomTransitionPage<void>` for admin child routes.
+- Produces: `_adminPage` returning `CustomTransitionPage<void>` for admin child routes and scale-only page/component entrance wrappers.
 
 - [x] **Step 1: Add a reduced-motion transition test**
 
@@ -227,11 +227,8 @@ Page<void> _adminPage({
       parent: animation,
       curve: InkSlotMotion.standard,
     );
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(.08, 0),
-        end: Offset.zero,
-      ).animate(curved),
+    return ScaleTransition(
+      scale: Tween<double>(begin: .965, end: 1).animate(curved),
       child: child,
     );
   },
@@ -295,8 +292,9 @@ changes must remain unstaged and uncommitted.
 - Build Web con `API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1`: aprobado.
 - Ajuste posterior: el fondo del documento Web usa `#0A0A0B`, igual que
   `InkSlotColors.ink`, para eliminar el contraste con las pantallas.
-- Ajuste posterior: la transición admin usa desplazamiento horizontal puro
-  desde la derecha; se eliminó `FadeTransition` por decisión visual.
+- Ajuste posterior: la transición admin usa escala suave escalonada, sin
+  `FadeTransition`, `SlideTransition` ni desplazamientos; la ruta escala de
+  `.965` a `1` y los componentes de `.975` a `1`.
 - La suite completa alcanzó 194 pruebas, pero conserva fallos fuera de este
   slice en `admin_appointment_detail_test.dart`,
   `new_booking_request_page_test.dart` y snapshots de booking; no se alteraron

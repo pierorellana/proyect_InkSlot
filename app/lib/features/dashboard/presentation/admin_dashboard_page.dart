@@ -9,6 +9,7 @@ import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../admin/presentation/admin_date_format.dart';
+import '../../admin/presentation/admin_motion.dart';
 import '../../auth/presentation/admin_session_controller.dart';
 import '../../requests/domain/booking_request.dart';
 import '../../requests/domain/booking_request_status.dart';
@@ -73,10 +74,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
     final topInset = isDesktop
         ? (media.padding.top < 58 ? 58.0 : media.padding.top)
         : 0.0;
-    return InkSlotScreenIn(
+    return AdminScaleIn(
       duration: const Duration(milliseconds: 550),
-      offset: 14,
-      fromScale: 1,
       child: AnimatedBuilder(
         animation: Listenable.merge([
           controller,
@@ -134,10 +133,9 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                             ),
                           ),
                         if (dashboard.syncIssues > 0)
-                          InkSlotRise(
+                          AdminScaleRise(
                             delay: const Duration(milliseconds: 60),
                             duration: const Duration(milliseconds: 650),
-                            offset: 16,
                             child: _SyncBanner(dashboard: dashboard),
                           ),
                         InkSlotSectionHeader(
@@ -199,9 +197,8 @@ class _Greeting extends StatelessWidget {
         : 'Buenas noches';
     final trimmed = name?.trim() ?? '';
     final first = trimmed.isEmpty ? null : trimmed.split(RegExp(r'\s+')).first;
-    return InkSlotRise(
+    return AdminScaleRise(
       duration: const Duration(milliseconds: 650),
-      offset: 16,
       child: Padding(
         padding: const EdgeInsets.only(top: 26),
         child: Column(

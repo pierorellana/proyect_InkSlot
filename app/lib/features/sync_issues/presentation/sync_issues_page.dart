@@ -6,6 +6,7 @@ import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
+import '../../admin/presentation/admin_motion.dart';
 import '../domain/sync_issue.dart';
 import 'sync_issues_controller.dart';
 
@@ -41,10 +42,8 @@ class _SyncIssuesPageState extends State<SyncIssuesPage> {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
-    return InkSlotScreenIn(
+    return AdminScaleIn(
       duration: const Duration(milliseconds: 550),
-      offset: 14,
-      fromScale: 1,
       child: AnimatedBuilder(
         animation: widget.controller,
         builder: (context, _) {
@@ -71,9 +70,8 @@ class _SyncIssuesPageState extends State<SyncIssuesPage> {
                   ),
                 ),
                 const SizedBox(height: 22),
-                InkSlotRise(
+                AdminScaleRise(
                   duration: const Duration(milliseconds: 650),
-                  offset: 16,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -96,10 +94,9 @@ class _SyncIssuesPageState extends State<SyncIssuesPage> {
                   ),
                 ),
                 const SizedBox(height: 18),
-                InkSlotRise(
+                AdminScaleRise(
                   delay: const Duration(milliseconds: 60),
                   duration: const Duration(milliseconds: 650),
-                  offset: 16,
                   child: Wrap(
                     spacing: 8,
                     runSpacing: 8,

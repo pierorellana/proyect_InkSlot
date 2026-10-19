@@ -275,8 +275,8 @@ abstract final class AppRouter {
   }) {
     return CustomTransitionPage<void>(
       key: state.pageKey,
-      transitionDuration: InkSlotMotion.screen,
-      reverseTransitionDuration: const Duration(milliseconds: 260),
+      transitionDuration: const Duration(milliseconds: 420),
+      reverseTransitionDuration: const Duration(milliseconds: 280),
       child: child,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
         if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
@@ -287,11 +287,8 @@ abstract final class AppRouter {
           parent: animation,
           curve: InkSlotMotion.standard,
         );
-        return SlideTransition(
-          position: Tween<Offset>(
-            begin: const Offset(.08, 0),
-            end: Offset.zero,
-          ).animate(curved),
+        return ScaleTransition(
+          scale: Tween<double>(begin: .965, end: 1).animate(curved),
           child: child,
         );
       },

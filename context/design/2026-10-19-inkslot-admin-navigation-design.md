@@ -22,10 +22,10 @@ detrás del teclado virtual al enfocar los campos del login.
   identidad del estudio, Inicio, Enlaces, Citas, Agenda y Cerrar sesión.
 - El drawer se cierra al elegir una ruta, tocar el scrim o usar el botón de
   cierre. La ruta activa conserva el tratamiento cobre del rail.
-- La navegación administrativa usa un desplazamiento horizontal puro desde la
-  derecha, compatible con `MediaQuery.disableAnimations` y sin desvanecido en
-  la transición del router. No se cambia la navegación pública ni se duplican
-  animaciones internas existentes más de lo necesario.
+- La navegación administrativa usa una escala suave y escalonada, sin opacidad
+  ni desplazamiento. La transición de ruta escala de `.965` a `1` y los
+  bloques de pantalla de `.975` a `1`, compatible con
+  `MediaQuery.disableAnimations`. No se cambia la navegación pública.
 - El documento Web declara fondo tinta y esquema de color oscuro en `html` y
   `body`, para que el viewport expuesto por el teclado de iOS no muestre
   blanco. El `Scaffold` del login continúa usando `resizeToAvoidBottomInset` y
@@ -53,12 +53,16 @@ detrás del teclado virtual al enfocar los campos del login.
 
 ## Transición
 
-La transición de rutas administrativas usará:
+La transición de rutas administrativas usa:
 
-- desplazamiento horizontal desde la derecha, aproximadamente `8%` del ancho;
+- escala de `.965` a `1`, sin `SlideTransition`, `Transform.translate` ni
+  `Opacity`;
 - curva `InkSlotMotion.standard`;
-- duración aproximada de `360–450 ms`;
-- duración cero o transición estática cuando `disableAnimations` esté activo.
+- duración de `420 ms` (reversa de `280 ms`);
+- escala escalonada de `.975` a `1` para los bloques internos, con pasos de
+  `55 ms`;
+- transición estática y componentes en escala final cuando
+  `disableAnimations` esté activo.
 
 El drawer tendrá una entrada lateral independiente, con scrim oscuro y una
 curva de hoja coherente con `InkSlotMotion.sheet`. No se añadirá WebGL ni una
