@@ -59,6 +59,33 @@ void main() {
     expect(find.text('Falta: confirmar anticipo'), findsOneWidget);
   });
 
+  testWidgets('keeps the action bar below the form when the keyboard is open', (
+    tester,
+  ) async {
+    usePhoneView(tester);
+    final controller = BookingRequestsController(
+      RecordingBookingRequestsRepository(),
+    );
+
+    await tester.pumpWidget(
+      _app(
+        home: MediaQuery(
+          data: const MediaQueryData(viewInsets: EdgeInsets.only(bottom: 360)),
+          child: Scaffold(
+            resizeToAvoidBottomInset: true,
+            body: NewBookingRequestHarness(controller: controller),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final nameField = tester.getRect(find.byType(TextField).first);
+    final actionButton = tester.getRect(find.text('Crear y generar enlace'));
+
+    expect(actionButton.top, greaterThanOrEqualTo(nameField.bottom));
+  });
+
   testWidgets(
     'submits all request fields and keeps the token out of the route',
     (tester) async {
@@ -88,6 +115,7 @@ void main() {
       await tester.enterText(textFields.at(0), 'Ana Ink');
       await tester.enterText(textFields.at(1), '+593 99 123 4567');
       await tester.enterText(textFields.at(2), 'Transferencia 0045');
+      await tester.ensureVisible(find.byType(InkSlotSwitch).first);
       await tester.tap(find.byType(InkSlotSwitch).first);
       await tester.pump();
       await tester.tap(find.text('Crear y generar enlace'));

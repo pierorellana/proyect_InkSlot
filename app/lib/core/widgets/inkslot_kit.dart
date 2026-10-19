@@ -493,6 +493,7 @@ class InkSlotField extends StatelessWidget {
         TextField(
           controller: controller,
           focusNode: focusNode,
+          scrollPadding: const EdgeInsets.symmetric(vertical: 24),
           obscureText: obscure,
           keyboardType: keyboardType,
           onChanged: onChanged,

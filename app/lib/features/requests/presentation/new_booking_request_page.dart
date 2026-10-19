@@ -114,16 +114,11 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
     final media = MediaQuery.of(context);
     final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
     return AdminScaleIn(
-      child: Stack(
+      child: Column(
         children: [
-          Positioned.fill(
+          Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                20,
-                topInset,
-                20,
-                140 + media.padding.bottom,
-              ),
+              padding: EdgeInsets.fromLTRB(20, topInset, 20, 32),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -180,15 +175,10 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
               ),
             ),
           ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: _BottomBar(
-              controller: widget.controller,
-              missing: _missing,
-              onSubmit: _submit,
-            ),
+          _BottomBar(
+            controller: widget.controller,
+            missing: _missing,
+            onSubmit: _submit,
           ),
         ],
       ),

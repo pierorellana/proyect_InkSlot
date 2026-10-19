@@ -48,6 +48,7 @@ class AdminShell extends StatelessWidget {
 
       return Scaffold(
         backgroundColor: InkSlotColors.ink,
+        resizeToAvoidBottomInset: true,
         drawer: isDesktop
             ? null
             : Drawer(
