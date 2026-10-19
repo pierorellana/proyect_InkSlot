@@ -64,6 +64,7 @@ class _InkSlotAppState extends State<InkSlotApp> {
     value: _sessionController,
     child: MaterialApp.router(
       title: 'InkSlot',
+      debugShowCheckedModeBanner: false,
       theme: buildInkSlotTheme(),
       routerConfig: _router,
     ),
