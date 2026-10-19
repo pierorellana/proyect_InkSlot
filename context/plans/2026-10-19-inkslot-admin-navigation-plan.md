@@ -274,7 +274,8 @@ changes must remain unstaged and uncommitted.
 ## Ejecución 2026-10-19
 
 - Commits: `d45e9a4`, `33bdd6a`, `2e29bf2`.
-- Tests enfocados admin/dashboard/auth: 14/14 aprobados.
+- Tests enfocados admin/dashboard/auth: 55/55 aprobados, incluyendo la
+  verificación de navegación inmediata con un solo `pump()`.
 - `fvm flutter analyze`: sin issues.
 - Build Web con `API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1`: aprobado.
 - Ajuste posterior: el fondo del documento Web usa `#0A0A0B`, igual que

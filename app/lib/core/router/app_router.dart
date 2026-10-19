@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 
 import '../../core/network/api_client.dart';
 import '../../core/network/api_exception.dart';
-import '../../core/theme/inkslot_tokens.dart';
 import '../../features/admin/presentation/admin_shell.dart';
 import '../../features/agenda/data/agenda_repository.dart';
 import '../../features/agenda/presentation/admin_agenda_page.dart';
@@ -272,28 +271,7 @@ abstract final class AppRouter {
   static Page<void> _adminPage({
     required GoRouterState state,
     required Widget child,
-  }) {
-    return CustomTransitionPage<void>(
-      key: state.pageKey,
-      transitionDuration: const Duration(milliseconds: 420),
-      reverseTransitionDuration: const Duration(milliseconds: 280),
-      child: child,
-      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        if (MediaQuery.maybeOf(context)?.disableAnimations ?? false) {
-          return child;
-        }
-
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: InkSlotMotion.standard,
-        );
-        return ScaleTransition(
-          scale: Tween<double>(begin: .965, end: 1).animate(curved),
-          child: child,
-        );
-      },
-    );
-  }
+  }) => NoTransitionPage<void>(key: state.pageKey, child: child);
 
   static String? _redirect(
     AdminSessionController session,

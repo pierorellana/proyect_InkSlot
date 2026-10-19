@@ -56,3 +56,4 @@ Para cada T: spec citada, tests unit/widget/integration pertinentes, errores/loa
 - `T-017-admin-navigation-cleanup`: se retiró `Nueva solicitud` del rail y drawer administrativos; la acción permanece en el contexto de Solicitudes.
 - `T-017-admin-login-copy`: placeholders del login administrativo ajustados a `Ingresa tu usuario` e `Ingresa tu contraseña`, con prueba widget de regresión.
 - `T-017-admin-transition`: reemplazada la transición admin por `NoTransitionPage` y wrappers estáticos; títulos, cards y componentes ya no aparecen sobre la pantalla anterior.
+- `T-017-admin-static-navigation`: validado el reemplazo instantáneo de rutas administrativas, sin superposición visual de páginas ni animación de entrada de componentes. Verificación 2026-10-19: `fvm flutter test` enfocado admin/dashboard/requests/agenda/sync/auth/appointments 55/55, `fvm flutter analyze` sin issues y build Web con la API del túnel aprobado.

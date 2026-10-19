@@ -126,12 +126,13 @@ void main() {
 
     await openDrawer();
     await tester.tap(_press('Citas'));
-    await tester.pumpAndSettle();
+    await tester.pump();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
       '/admin/appointments',
     );
     expect(find.byType(AdminAppointmentsPage), findsOneWidget);
+    await tester.pumpAndSettle();
 
     await openDrawer();
     await tester.tap(_press('Agenda'));
