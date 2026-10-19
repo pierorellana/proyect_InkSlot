@@ -29,7 +29,7 @@
 - Consumes: `InkSlotColors.deep` (`#050505`) and `InkSlotColors.ink` (`#0A0A0B`).
 - Produces: A Web document whose exposed viewport remains dark when iOS resizes the Flutter canvas for the virtual keyboard.
 
-- [ ] **Step 1: Add the failing/static regression check**
+- [x] **Step 1: Add the failing/static regression check**
 
 Verify the current document does not declare a dark `html/body` background:
 
@@ -39,7 +39,7 @@ rg -n "html|body|background|color-scheme" app/web/index.html
 
 Expected before the change: no InkSlot dark document rule.
 
-- [ ] **Step 2: Add the Web surface rules**
+- [x] **Step 2: Add the Web surface rules**
 
 Add a small inline style before `</head>`:
 
@@ -62,7 +62,7 @@ Add a small inline style before `</head>`:
 
 The Flutter canvas remains responsible for scrolling inside the login page; the browser document must not paint a white overscroll area.
 
-- [ ] **Step 3: Verify the document and login behavior**
+- [x] **Step 3: Verify the document and login behavior**
 
 Run:
 
@@ -73,7 +73,7 @@ fvm flutter test test/features/auth/admin_login_page_test.dart
 
 Expected: no whitespace errors and all login tests pass.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add app/web/index.html
@@ -91,7 +91,7 @@ git commit -m "fix(app): keep web login viewport dark"
 - Consumes: `_AdminDestination`, `_destinationFor`, session controller and existing route paths.
 - Produces: Mobile `AdminMobileHeader`, `AdminDrawer`, drawer route actions and a shell without `_AdminTabBar` below `860 px`.
 
-- [ ] **Step 1: Write failing responsive navigation tests**
+- [x] **Step 1: Write failing responsive navigation tests**
 
 Extend the existing shell test to assert on a `390 × 844` viewport:
 
@@ -106,7 +106,7 @@ expect(find.text('Cerrar sesión'), findsOneWidget);
 
 Add a desktop assertion that `Abrir menú` is absent and `Cerrar sesión` remains visible.
 
-- [ ] **Step 2: Run the shell tests and confirm the old mobile behavior**
+- [x] **Step 2: Run the shell tests and confirm the old mobile behavior**
 
 Run:
 
@@ -116,7 +116,7 @@ fvm flutter test test/features/admin/admin_router_test.dart
 
 Expected before the change: the current mobile test still finds `ENLACES` and does not find a hamburger.
 
-- [ ] **Step 3: Refactor `AdminShell` around one responsive `Scaffold`**
+- [x] **Step 3: Refactor `AdminShell` around one responsive `Scaffold`**
 
 Use `LayoutBuilder` to create a `Scaffold` with:
 
@@ -147,7 +147,7 @@ The header must expose `Semantics(label: 'Abrir menú', button: true)` and call
 logo, `DODOGIO`, a compact 44 px action target and a custom three-line menu
 mark in the InkSlot palette.
 
-- [ ] **Step 4: Implement drawer route behavior**
+- [x] **Step 4: Implement drawer route behavior**
 
 The drawer must list these exact destinations:
 
@@ -164,13 +164,13 @@ Each route action first closes the drawer with `Navigator.of(context).pop()`
 and then calls `context.go(path)`. Use the active copper/tobacco treatment
 already used by `_RailItem`; do not change API state or Provider lifetimes.
 
-- [ ] **Step 5: Remove dashboard header duplication**
+- [x] **Step 5: Remove dashboard header duplication**
 
 Remove or reduce the dashboard page’s mobile-only identity header so the shell
 header is the single logo/menu surface. Preserve the dashboard greeting,
 session data and logout behavior through the drawer.
 
-- [ ] **Step 6: Run responsive tests and commit**
+- [x] **Step 6: Run responsive tests and commit**
 
 Run:
 
@@ -196,7 +196,7 @@ git commit -m "feat(app): add mobile admin navigation drawer"
 - Consumes: existing admin route builders and `InkSlotMotion.standard`.
 - Produces: `_adminPage` returning `CustomTransitionPage<void>` for admin child routes.
 
-- [ ] **Step 1: Add a reduced-motion transition test**
+- [x] **Step 1: Add a reduced-motion transition test**
 
 Keep the router test’s `MediaQueryData(disableAnimations: true)` and assert that
 navigation reaches the destination without waiting for an animation:
@@ -207,7 +207,7 @@ await tester.pump();
 expect(find.byType(AdminAppointmentsPage), findsOneWidget);
 ```
 
-- [ ] **Step 2: Implement `_adminPage`**
+- [x] **Step 2: Implement `_adminPage`**
 
 Replace admin child route `builder:` entries with `pageBuilder:` entries that
 call a helper of this shape:
@@ -244,7 +244,7 @@ Page<void> _adminPage({
 Apply this only to routes under the admin shell; public deep links retain their
 current routing and motion.
 
-- [ ] **Step 3: Verify navigation and commit**
+- [x] **Step 3: Verify navigation and commit**
 
 Run:
 
@@ -261,7 +261,7 @@ git commit -m "feat(app): animate admin route transitions"
 **Files:**
 - Verify only; no new source files.
 
-- [ ] **Step 1: Run focused login and admin tests**
+- [x] **Step 1: Run focused login and admin tests**
 
 ```bash
 fvm flutter test test/features/auth/admin_login_page_test.dart test/features/admin/admin_router_test.dart
@@ -274,13 +274,13 @@ fvm flutter test
 fvm flutter analyze
 ```
 
-- [ ] **Step 3: Regenerate the tunnel build**
+- [x] **Step 3: Regenerate the tunnel build**
 
 ```bash
 fvm flutter build web --no-wasm-dry-run --dart-define=API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1
 ```
 
-- [ ] **Step 4: Confirm the local web server and preserve unrelated work**
+- [x] **Step 4: Confirm the local web server and preserve unrelated work**
 
 ```bash
 git diff --check
@@ -289,4 +289,15 @@ git status --short
 
 The build must serve through the existing port `8080`. Any unrelated user
 changes must remain unstaged and uncommitted.
+
+## Ejecución 2026-10-19
+
+- Commits: `d45e9a4`, `33bdd6a`, `2e29bf2`.
+- Tests enfocados admin/dashboard/auth: 14/14 aprobados.
+- `fvm flutter analyze`: sin issues.
+- Build Web con `API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1`: aprobado.
+- La suite completa alcanzó 194 pruebas, pero conserva fallos fuera de este
+  slice en `admin_appointment_detail_test.dart`,
+  `new_booking_request_page_test.dart` y snapshots de booking; no se alteraron
+  esos archivos.
 

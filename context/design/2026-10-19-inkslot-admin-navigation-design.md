@@ -1,7 +1,7 @@
 # Diseño: navegación administrativa responsive y fondo Web del login
 
 **Fecha:** 2026-10-19  
-**Estado:** aprobado conceptualmente; pendiente de revisión del documento  
+**Estado:** aprobado e implementado
 **Alcance:** ajuste visual del shell administrativo, login Web y transiciones
 
 ## Objetivo
