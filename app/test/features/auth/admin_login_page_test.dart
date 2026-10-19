@@ -37,6 +37,9 @@ void main() {
     final controller = AdminSessionController(repository);
     await tester.pumpWidget(harness(controller));
 
+    expect(find.text('Ingresa tu usuario'), findsOneWidget);
+    expect(find.text('Ingresa tu contraseña'), findsOneWidget);
+
     await tester.tap(find.text('Entrar'));
     await tester.pump();
 

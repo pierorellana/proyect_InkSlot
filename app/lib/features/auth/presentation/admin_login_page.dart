@@ -197,6 +197,7 @@ class _LoginContent extends StatelessWidget {
                   InkSlotField(
                     label: 'Usuario',
                     controller: usernameController,
+                    hint: 'Ingresa tu usuario',
                     keyboardType: TextInputType.text,
                     textInputAction: TextInputAction.next,
                     autofillHints: const [
@@ -209,7 +210,7 @@ class _LoginContent extends StatelessWidget {
                   InkSlotField(
                     label: 'Contraseña',
                     controller: passwordController,
-                    hint: 'Tu contraseña',
+                    hint: 'Ingresa tu contraseña',
                     obscure: true,
                     textInputAction: TextInputAction.done,
                     autofillHints: const [AutofillHints.password],
