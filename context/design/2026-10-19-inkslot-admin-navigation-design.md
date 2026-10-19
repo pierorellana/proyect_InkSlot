@@ -36,7 +36,8 @@ detrás del teclado virtual al enfocar los campos del login.
 
 1. Safari enfoca Usuario o Contraseña.
 2. El viewport puede reducirse por el teclado.
-3. `html`, `body` y el root de Flutter conservan `#0A0A0B`/`#050505`.
+3. `html`, `body` y el root de Flutter conservan `#0A0A0B`, evitando un
+   contraste visible entre el viewport del navegador y la pantalla.
 4. El formulario se desplaza dentro de su `CustomScrollView` sin revelar una
    superficie blanca.
 

@@ -26,7 +26,8 @@
 - Test: `app/test/features/auth/admin_login_page_test.dart` only if a regression assertion is needed for the login viewport.
 
 **Interfaces:**
-- Consumes: `InkSlotColors.deep` (`#050505`) and `InkSlotColors.ink` (`#0A0A0B`).
+- Consumes: `InkSlotColors.ink` (`#0A0A0B`), the base background used by the
+  public screens and login.
 - Produces: A Web document whose exposed viewport remains dark when iOS resizes the Flutter canvas for the virtual keyboard.
 
 - [x] **Step 1: Add the failing/static regression check**
@@ -49,7 +50,7 @@ Add a small inline style before `</head>`:
   body {
     height: 100%;
     margin: 0;
-    background: #050505;
+    background: #0A0A0B;
     color-scheme: dark;
     overscroll-behavior: none;
   }
@@ -296,6 +297,8 @@ changes must remain unstaged and uncommitted.
 - Tests enfocados admin/dashboard/auth: 14/14 aprobados.
 - `fvm flutter analyze`: sin issues.
 - Build Web con `API_BASE_URL=https://9hqbzkgw-3000.use.devtunnels.ms/v1`: aprobado.
+- Ajuste posterior: el fondo del documento Web usa `#0A0A0B`, igual que
+  `InkSlotColors.ink`, para eliminar el contraste con las pantallas.
 - La suite completa alcanzó 194 pruebas, pero conserva fallos fuera de este
   slice en `admin_appointment_detail_test.dart`,
   `new_booking_request_page_test.dart` y snapshots de booking; no se alteraron
