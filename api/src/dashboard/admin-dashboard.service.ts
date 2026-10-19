@@ -7,6 +7,7 @@ import {
 import { Injectable } from '@nestjs/common';
 
 import { PrismaService } from '../database/prisma.service';
+import { expirePendingBookingRequests } from '../requests/booking-request-expiration';
 
 export type AdminDashboardResponse = {
   pendingRequests: number;
@@ -50,6 +51,8 @@ export class AdminDashboardService {
       status: AppointmentStatus.CONFIRMED,
       startAt: { gte: now },
     };
+
+    await expirePendingBookingRequests(this.prisma, artistId, now);
 
     const [pendingRequests, upcomingAppointments, syncIssues, appointments] =
       await Promise.all([

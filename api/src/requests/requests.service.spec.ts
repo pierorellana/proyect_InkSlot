@@ -47,6 +47,10 @@ describe('BookingRequestsService administration', () => {
         [Prisma.BookingRequestFindFirstArgs]
       >(),
       findMany: jest.fn<Promise<Row[]>, [Prisma.BookingRequestFindManyArgs]>(),
+      updateMany: jest.fn<
+        Promise<Prisma.BatchPayload>,
+        [Prisma.BookingRequestUpdateManyArgs]
+      >(),
       update: jest.fn<Promise<Row>, [Prisma.BookingRequestUpdateArgs]>(),
     },
     bookingToken: {
@@ -121,6 +125,7 @@ describe('BookingRequestsService administration', () => {
     tx.bookingRequest.create.mockImplementation(() => Promise.resolve(row));
     tx.bookingRequest.findFirst.mockImplementation(() => Promise.resolve(row));
     tx.bookingRequest.findMany.mockResolvedValue([row]);
+    tx.bookingRequest.updateMany.mockResolvedValue({ count: 0 });
     tx.bookingRequest.update.mockImplementation((args) => {
       const status = args.data.status;
       return Promise.resolve({
@@ -510,6 +515,33 @@ describe('BookingRequestsService administration', () => {
     );
     expect(JSON.stringify(result)).not.toContain(tokenHash);
     expect(JSON.stringify(result)).not.toContain(rawToken);
+  });
+
+  it('normalizes expired pending requests before listing them', async () => {
+    await service.list(artistId, { status: 'expired' });
+
+    expect(tx.bookingRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        artistId,
+        status: BookingRequestStatus.PENDING,
+        tokens: {
+          some: {
+            revokedAt: null,
+            consumedAt: null,
+            expiresAt: { lte: now },
+          },
+          none: {
+            revokedAt: null,
+            consumedAt: null,
+            expiresAt: { gt: now },
+          },
+        },
+      },
+      data: {
+        status: BookingRequestStatus.EXPIRED,
+        version: { increment: 1 },
+      },
+    });
   });
 
   it('rejects invalid cursor and status safely', async () => {

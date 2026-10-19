@@ -334,6 +334,40 @@ describe('booking request lifecycle', () => {
     expect(errorCode(foreignDetail)).toBe('NOT_FOUND');
   });
 
+  it('moves expired pending links out of the pending list', async () => {
+    const expired = await createInline();
+    await prisma.bookingToken.updateMany({
+      where: { requestId: expired.response.request.id },
+      data: { expiresAt: new Date('2000-01-01T00:00:00.000Z') },
+    });
+
+    const pendingList = await request(app.getHttpServer())
+      .get('/v1/admin/booking-requests?status=pending')
+      .set('Cookie', cookies)
+      .expect(200);
+    expect(
+      (pendingList.body as ListResponse).items.some(
+        (item) => item.id === expired.response.request.id,
+      ),
+    ).toBe(false);
+
+    const expiredList = await request(app.getHttpServer())
+      .get('/v1/admin/booking-requests?status=expired')
+      .set('Cookie', cookies)
+      .expect(200);
+    expect(
+      (expiredList.body as ListResponse).items.some(
+        (item) => item.id === expired.response.request.id,
+      ),
+    ).toBe(true);
+    await expect(
+      prisma.bookingRequest.findUniqueOrThrow({
+        where: { id: expired.response.request.id },
+        select: { status: true },
+      }),
+    ).resolves.toMatchObject({ status: BookingRequestStatus.EXPIRED });
+  });
+
   it('rotates tokens on renew and revokes the previous public link', async () => {
     const created = await createInline();
     const renewed = await request(app.getHttpServer())

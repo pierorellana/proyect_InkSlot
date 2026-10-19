@@ -12,6 +12,7 @@ import { isEmail } from 'class-validator';
 import { BookingRequestStatus, Prisma } from '@prisma/client';
 
 import { PrismaService } from '../database/prisma.service';
+import { expirePendingBookingRequests } from './booking-request-expiration';
 import {
   BOOKING_REQUEST_PAGE_SIZE,
   DEFAULT_BOOKING_TOKEN_TTL_HOURS,
@@ -281,6 +282,7 @@ export class BookingRequestsService {
         throw badRequest('BAD_REQUEST', 'El estado no es válido');
       }
       const status = this.statusFromFilter(query.status);
+      await expirePendingBookingRequests(this.prisma, artistId, new Date());
       const cursor = query.cursor ? decodeBookingCursor(query.cursor) : null;
       const where: Prisma.BookingRequestWhereInput = {
         artistId,

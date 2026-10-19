@@ -14,7 +14,7 @@ describe('AdminDashboardService', () => {
   const now = new Date('2026-10-16T12:00:00.000Z');
 
   const prisma = {
-    bookingRequest: { count: jest.fn() },
+    bookingRequest: { count: jest.fn(), updateMany: jest.fn() },
     appointment: { count: jest.fn(), findMany: jest.fn() },
     syncIssue: { count: jest.fn() },
   };
@@ -25,6 +25,7 @@ describe('AdminDashboardService', () => {
     jest.resetAllMocks();
     jest.useFakeTimers().setSystemTime(now);
     prisma.bookingRequest.count.mockResolvedValue(0);
+    prisma.bookingRequest.updateMany.mockResolvedValue({ count: 0 });
     prisma.appointment.count.mockResolvedValue(0);
     prisma.syncIssue.count.mockResolvedValue(0);
     prisma.appointment.findMany.mockResolvedValue([]);
@@ -91,6 +92,33 @@ describe('AdminDashboardService', () => {
     expect(JSON.stringify(await service.get(artistId))).not.toContain(
       'calendarId',
     );
+  });
+
+  it('normalizes expired pending requests before calculating the dashboard', async () => {
+    await service.get(artistId);
+
+    expect(prisma.bookingRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        artistId,
+        status: BookingRequestStatus.PENDING,
+        tokens: {
+          some: {
+            revokedAt: null,
+            consumedAt: null,
+            expiresAt: { lte: now },
+          },
+          none: {
+            revokedAt: null,
+            consumedAt: null,
+            expiresAt: { gt: now },
+          },
+        },
+      },
+      data: {
+        status: BookingRequestStatus.EXPIRED,
+        version: { increment: 1 },
+      },
+    });
   });
 
   it('uses the artist scope for every query and excludes non-pending, past, and non-confirmed records', async () => {
