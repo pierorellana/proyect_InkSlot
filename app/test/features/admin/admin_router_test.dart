@@ -5,6 +5,7 @@ import 'package:inkslot_app/core/network/api_client.dart';
 import 'package:inkslot_app/core/network/api_exception.dart';
 import 'package:inkslot_app/core/router/app_router.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
+import 'package:inkslot_app/core/widgets/inkslot_motion.dart';
 import 'package:inkslot_app/features/agenda/presentation/admin_agenda_page.dart';
 import 'package:inkslot_app/features/appointments/data/admin_appointments_repository.dart';
 import 'package:inkslot_app/features/appointments/domain/admin_appointment.dart';
@@ -80,7 +81,6 @@ void main() {
     expect(router.routerDelegate.currentConfiguration.uri.path, '/admin');
     expect(find.byType(AdminShell), findsOneWidget);
     expect(find.byType(AdminDashboardPage), findsOneWidget);
-    expect(find.bySemanticsLabel('Inicio'), findsOneWidget);
   });
 
   testWidgets('navigates between admin destinations with stable controllers', (
@@ -107,10 +107,25 @@ void main() {
     addTearDown(appointments.dispose);
     addTearDown(syncIssues.dispose);
 
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1;
+    tester.binding.handleMetricsChanged();
+    addTearDown(() {
+      tester.view
+        ..physicalSize = const Size(800, 600)
+        ..devicePixelRatio = 1;
+    });
     await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('CITAS'));
+    Future<void> openDrawer() async {
+      await tester.tap(_press('Abrir menú'));
+      await tester.pumpAndSettle();
+    }
+
+    await openDrawer();
+    await tester.tap(_press('Citas'));
     await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
@@ -118,7 +133,8 @@ void main() {
     );
     expect(find.byType(AdminAppointmentsPage), findsOneWidget);
 
-    await tester.tap(find.text('AGENDA'));
+    await openDrawer();
+    await tester.tap(_press('Agenda'));
     await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
@@ -126,12 +142,14 @@ void main() {
     );
     expect(find.byType(AdminAgendaPage), findsOneWidget);
 
-    await tester.tap(find.text('INICIO'));
+    await openDrawer();
+    await tester.tap(_press('Inicio'));
     await tester.pumpAndSettle();
     expect(router.routerDelegate.currentConfiguration.uri.path, '/admin');
     expect(find.byType(AdminDashboardPage), findsOneWidget);
 
-    await tester.tap(find.bySemanticsLabel('Nueva solicitud').first);
+    await openDrawer();
+    await tester.tap(find.text('Nueva solicitud').last);
     await tester.pumpAndSettle();
     expect(
       router.routerDelegate.currentConfiguration.uri.path,
@@ -236,14 +254,23 @@ void main() {
     await tester.pumpWidget(_app(router));
     await tester.pumpAndSettle();
     expect(find.text('Cerrar sesión'), findsOneWidget);
-    expect(find.text('ENLACES'), findsNothing);
+    expect(_press('Abrir menú'), findsNothing);
 
     tester.view.physicalSize = const Size(390, 844);
+    tester.binding.handleMetricsChanged();
     await tester.pumpAndSettle();
-    expect(find.text('ENLACES'), findsOneWidget);
+    expect(_press('Abrir menú'), findsOneWidget);
     expect(find.text('Cerrar sesión'), findsNothing);
+
+    await tester.tap(_press('Abrir menú'));
+    await tester.pumpAndSettle();
+    expect(find.bySemanticsLabel('Enlaces'), findsOneWidget);
   });
 }
+
+Finder _press(String label) => find.byWidgetPredicate(
+  (widget) => widget is InkSlotPress && widget.semanticLabel == label,
+);
 
 class EmptyBookingRequestsController extends BookingRequestsController {
   EmptyBookingRequestsController() : super(EmptyBookingRequestsRepository());

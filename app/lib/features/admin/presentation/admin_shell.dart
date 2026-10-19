@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -22,44 +20,143 @@ class AdminShell extends StatelessWidget {
   final AdminSessionController sessionController;
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: InkSlotColors.ink,
-    body: LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth >= 860;
-        final path = GoRouterState.of(context).uri.path;
-        final selected = _destinationFor(path);
-        final content = _AdminContent(child: child);
-        const grain = Positioned.fill(
-          child: RepaintBoundary(child: InkSlotGrain()),
-        );
-        if (isDesktop) {
-          return Row(
-            children: [
-              _AdminRail(
-                sessionController: sessionController,
-                selected: selected,
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final isDesktop = constraints.maxWidth >= 860;
+      final path = GoRouterState.of(context).uri.path;
+      final selected = _destinationFor(path);
+      final content = _AdminContent(child: child);
+      final body = isDesktop
+          ? Row(
+              children: [
+                _AdminRail(
+                  sessionController: sessionController,
+                  selected: selected,
+                ),
+                Expanded(child: _AdminSurface(content: content)),
+              ],
+            )
+          : Column(
+              children: [
+                Builder(
+                  builder: (scaffoldContext) => _AdminMobileHeader(
+                    onOpenMenu: () => Scaffold.of(scaffoldContext).openDrawer(),
+                  ),
+                ),
+                Expanded(child: _AdminSurface(content: content)),
+              ],
+            );
+
+      return Scaffold(
+        backgroundColor: InkSlotColors.ink,
+        drawer: isDesktop
+            ? null
+            : Drawer(
+                backgroundColor: InkSlotColors.deep,
+                elevation: 0,
+                child: _AdminDrawer(
+                  sessionController: sessionController,
+                  selected: selected,
+                ),
               ),
-              Expanded(child: Stack(children: [content, grain])),
-            ],
-          );
-        }
-        return Stack(
-          children: [
-            Positioned.fill(child: content),
-            grain,
-            if (_showsTabBar(path))
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _AdminTabBar(selected: selected),
+        body: body,
+      );
+    },
+  );
+}
+
+class _AdminSurface extends StatelessWidget {
+  const _AdminSurface({required this.content});
+
+  final Widget content;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(child: content),
+      const Positioned.fill(child: RepaintBoundary(child: InkSlotGrain())),
+    ],
+  );
+}
+
+class _AdminMobileHeader extends StatelessWidget {
+  const _AdminMobileHeader({required this.onOpenMenu});
+
+  final VoidCallback onOpenMenu;
+
+  @override
+  Widget build(BuildContext context) => SafeArea(
+    bottom: false,
+    child: Container(
+      height: 68,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      decoration: const BoxDecoration(
+        color: InkSlotColors.deep,
+        border: Border(bottom: BorderSide(color: InkSlotColors.line)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: InkSlotColors.bone,
+              shape: BoxShape.circle,
+            ),
+            alignment: Alignment.center,
+            child: const InkSlotLogo(size: 17, color: InkSlotColors.ink),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            'DODOGIO',
+            style: inkSlotMono(
+              size: 11,
+              color: InkSlotColors.bone,
+              spacing: .28,
+            ),
+          ),
+          const Spacer(),
+          InkSlotPress(
+            semanticLabel: 'Abrir menú',
+            onTap: onOpenMenu,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0x0FEEE9E0),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: InkSlotColors.line),
               ),
-          ],
-        );
-      },
+              alignment: Alignment.center,
+              child: const CustomPaint(
+                size: Size(20, 20),
+                painter: _MenuIconPainter(),
+              ),
+            ),
+          ),
+        ],
+      ),
     ),
   );
+}
+
+class _MenuIconPainter extends CustomPainter {
+  const _MenuIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = InkSlotColors.bone
+      ..strokeWidth = 1.8
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    for (final y in [4.0, 10.0, 16.0]) {
+      canvas.drawLine(Offset(1, y), Offset(size.width - 1, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_MenuIconPainter oldDelegate) => false;
 }
 
 /// Centra el contenido en 640 px conservando restricciones ajustadas.
@@ -94,116 +191,102 @@ _AdminDestination _destinationFor(String path) {
   return _AdminDestination.none;
 }
 
-bool _showsTabBar(String path) {
-  final normalized = path.length > 1 && path.endsWith('/')
-      ? path.substring(0, path.length - 1)
-      : path;
-  return const {
-    '/admin',
-    '/admin/requests',
-    '/admin/appointments',
-    '/admin/agenda',
-  }.contains(normalized);
-}
+class _AdminDrawer extends StatelessWidget {
+  const _AdminDrawer({required this.sessionController, required this.selected});
 
-/// `.tabbar`: píldora flotante de 68 px con blur y FAB central.
-class _AdminTabBar extends StatelessWidget {
-  const _AdminTabBar({required this.selected});
-
+  final AdminSessionController sessionController;
   final _AdminDestination selected;
 
   @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        0,
-        16,
-        bottomInset > 24 ? bottomInset : 24,
+  Widget build(BuildContext context) => SafeArea(
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      decoration: const BoxDecoration(
+        color: InkSlotColors.deep,
+        border: Border(right: BorderSide(color: InkSlotColors.line)),
       ),
-      child: Center(
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 560),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(34),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                height: 68,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xDB161618),
-                  borderRadius: BorderRadius.circular(34),
-                  border: Border.all(color: const Color(0x17EEE9E0)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: InkSlotColors.bone,
+                  shape: BoxShape.circle,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _TabButton(
-                      label: 'Inicio',
-                      icon: InkSlotIcons.inicio,
-                      selected: selected == _AdminDestination.home,
-                      onTap: () => context.go('/admin'),
-                    ),
-                    _TabButton(
-                      label: 'Enlaces',
-                      icon: InkSlotIcons.enlace,
-                      selected: selected == _AdminDestination.requests,
-                      onTap: () => context.go('/admin/requests'),
-                    ),
-                    InkSlotPress(
-                      semanticLabel: 'Nueva solicitud',
-                      onTap: () => context.go('/admin/requests/new'),
-                      child: Container(
-                        width: 56,
-                        height: 56,
-                        decoration: const BoxDecoration(
-                          color: InkSlotColors.copper,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0x99C87939),
-                              blurRadius: 28,
-                              spreadRadius: -8,
-                              offset: Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        alignment: Alignment.center,
-                        child: const InkSlotIcon(
-                          InkSlotIcons.mas,
-                          color: InkSlotColors.ink,
-                        ),
-                      ),
-                    ),
-                    _TabButton(
-                      label: 'Citas',
-                      icon: InkSlotIcons.calendario,
-                      selected: selected == _AdminDestination.appointments,
-                      onTap: () => context.go('/admin/appointments'),
-                    ),
-                    _TabButton(
-                      label: 'Agenda',
-                      icon: InkSlotIcons.reloj,
-                      selected: selected == _AdminDestination.agenda,
-                      onTap: () => context.go('/admin/agenda'),
-                    ),
-                  ],
+                alignment: Alignment.center,
+                child: const InkSlotLogo(size: 18, color: InkSlotColors.ink),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                'DODOGIO',
+                style: inkSlotMono(
+                  size: 12,
+                  color: InkSlotColors.bone,
+                  spacing: .32,
                 ),
               ),
-            ),
+            ],
           ),
-        ),
+          const SizedBox(height: 36),
+          _DrawerItem(
+            label: 'Inicio',
+            icon: InkSlotIcons.inicio,
+            selected: selected == _AdminDestination.home,
+            onTap: () => _go(context, '/admin'),
+          ),
+          _DrawerItem(
+            label: 'Enlaces',
+            icon: InkSlotIcons.enlace,
+            selected: selected == _AdminDestination.requests,
+            onTap: () => _go(context, '/admin/requests'),
+          ),
+          _DrawerItem(
+            label: 'Citas',
+            icon: InkSlotIcons.calendario,
+            selected: selected == _AdminDestination.appointments,
+            onTap: () => _go(context, '/admin/appointments'),
+          ),
+          _DrawerItem(
+            label: 'Agenda',
+            icon: InkSlotIcons.reloj,
+            selected: selected == _AdminDestination.agenda,
+            onTap: () => _go(context, '/admin/agenda'),
+          ),
+          const SizedBox(height: 20),
+          InkSlotPrimaryButton(
+            label: 'Nueva solicitud',
+            leading: const InkSlotIcon(InkSlotIcons.mas, size: 20),
+            onPressed: () => _go(context, '/admin/requests/new'),
+          ),
+          const Spacer(),
+          _UserTile(sessionController: sessionController),
+          const SizedBox(height: 14),
+          InkSlotGhostButton(
+            label: 'Cerrar sesión',
+            height: 44,
+            onPressed: () {
+              Navigator.of(context).pop();
+              sessionController.logout();
+            },
+          ),
+        ],
       ),
-    );
+    ),
+  );
+
+  void _go(BuildContext context, String location) {
+    Navigator.of(context).pop();
+    context.go(location);
   }
 }
 
-/// `.tb`: 52×52, icono 22 y etiqueta mono de 9 px.
-class _TabButton extends StatelessWidget {
-  const _TabButton({
+class _DrawerItem extends StatelessWidget {
+  const _DrawerItem({
     required this.label,
     required this.icon,
     required this.selected,
@@ -217,28 +300,36 @@ class _TabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected ? InkSlotColors.copperLight : InkSlotColors.tertiary;
-    return Semantics(
-      selected: selected,
-      child: InkSlotPress(
-        semanticLabel: label,
-        onTap: onTap,
-        child: ExcludeSemantics(
-          child: SizedBox(
-            width: 52,
-            height: 52,
-            child: TweenAnimationBuilder<Color?>(
-              tween: ColorTween(end: color),
+    final color = selected
+        ? InkSlotColors.copperLight
+        : InkSlotColors.secondary;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Semantics(
+        selected: selected,
+        child: InkSlotPress(
+          semanticLabel: label,
+          onTap: onTap,
+          child: ExcludeSemantics(
+            child: AnimatedContainer(
               duration: const Duration(milliseconds: 250),
-              builder: (context, value, _) => Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+              height: 48,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: selected ? InkSlotColors.tobacco : Colors.transparent,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Row(
                 children: [
-                  InkSlotIcon(icon, size: 22, color: value),
-                  const SizedBox(height: 3),
+                  InkSlotIcon(icon, size: 20, color: color),
+                  const SizedBox(width: 12),
                   Text(
-                    label.toUpperCase(),
-                    maxLines: 1,
-                    style: inkSlotMono(size: 9, color: value!, spacing: .06),
+                    label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 15,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
                   ),
                 ],
               ),

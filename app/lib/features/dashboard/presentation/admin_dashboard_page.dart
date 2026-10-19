@@ -6,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
-import '../../../core/widgets/inkslot_logo.dart';
 import '../../../core/widgets/inkslot_motion.dart';
 import '../../../core/widgets/inkslot_primary_button.dart';
 import '../../admin/presentation/admin_date_format.dart';
@@ -70,7 +69,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final topInset = media.padding.top < 58 ? 58.0 : media.padding.top;
+    final isDesktop = media.size.width >= 860;
+    final topInset = isDesktop
+        ? (media.padding.top < 58 ? 58.0 : media.padding.top)
+        : 0.0;
     return InkSlotScreenIn(
       duration: const Duration(milliseconds: 550),
       offset: 14,
@@ -108,10 +110,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _Header(
-                        name: user?.name,
-                        onLogout: widget.sessionController?.logout,
-                      ),
                       _Greeting(name: user?.name),
                       if (initialLoading)
                         const _LoadingState()
@@ -182,68 +180,6 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           );
         },
       ),
-    );
-  }
-}
-
-class _Header extends StatelessWidget {
-  const _Header({required this.name, required this.onLogout});
-
-  final String? name;
-  final VoidCallback? onLogout;
-
-  @override
-  Widget build(BuildContext context) {
-    final trimmed = name?.trim() ?? '';
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                color: InkSlotColors.bone,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const InkSlotLogo(size: 18, color: InkSlotColors.ink),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              'DODOGIO',
-              style: inkSlotMono(
-                size: 12,
-                color: InkSlotColors.bone,
-                spacing: .32,
-              ),
-            ),
-          ],
-        ),
-        InkSlotPress(
-          semanticLabel: 'Cerrar sesión',
-          onTap: onLogout,
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: const Color(0x0FEEE9E0),
-              border: Border.all(color: InkSlotColors.line),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              trimmed.isEmpty ? 'I' : trimmed[0].toUpperCase(),
-              style: const TextStyle(
-                color: InkSlotColors.bone,
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
