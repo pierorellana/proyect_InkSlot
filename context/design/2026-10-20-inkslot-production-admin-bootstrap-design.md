@@ -1,7 +1,7 @@
 # InkSlot — bootstrap del administrador productivo
 
 **Fecha:** 2026-10-20  
-**Estado:** Propuesta aprobada para revisión escrita  
+**Estado:** Aprobada para implementación
 **Alcance:** Provisionar el primer administrador productivo sin cargar datos demo.
 
 ## Objetivo
@@ -10,7 +10,7 @@ Crear de forma explícita y repetible el único administrador inicial de producc
 
 - Artista: `Dodogio`
 - Usuario de acceso: `dodo`
-- Contraseña inicial: `1234`
+- Contraseña inicial: definida fuera del repositorio durante el provisioning
 - Correo interno: `pierorellanao6@gmail.com`
 
 El correo se almacena como identificador único del artista y no se muestra como
@@ -39,19 +39,24 @@ restablece el fixture completo de demo.
 
 ## Configuración propuesta
 
-El comando recibirá variables de entorno temporales:
+El comando recibirá las siguientes variables de entorno; la contraseña y la
+confirmación son temporales, mientras que el mapeo no secreto de login
+permanece configurado en Render:
 
 ```env
 ADMIN_LOGIN_USERNAME=dodo
 ADMIN_EMAIL=pierorellanao6@gmail.com
-ADMIN_PASSWORD=1234
+ADMIN_PASSWORD=(se configura fuera del repositorio)
 ADMIN_DISPLAY_NAME=Dodogio
 ADMIN_BOOTSTRAP_CONFIRM=CREATE_PRODUCTION_ADMIN
 ```
 
-Estas variables se configurarán solo para la ejecución del comando y se
-eliminarán del entorno de despliegue después de completarlo. No se añadirán
-credenciales al repositorio ni al bundle Flutter.
+`ADMIN_LOGIN_USERNAME`, `ADMIN_EMAIL` y `ADMIN_DISPLAY_NAME` permanecerán como
+configuración no secreta del servicio Render, porque el login necesita resolver
+`dodo` al correo del artista después del provisioning. `ADMIN_PASSWORD` y
+`ADMIN_BOOTSTRAP_CONFIRM` se configurarán solo para la ejecución del comando y
+se eliminarán del entorno de despliegue después de completarlo. No se añadirá
+la contraseña al repositorio, al historial de shell ni al bundle Flutter.
 
 El resolvedor de login dejará de depender de nombres `DEMO_*` para el acceso
 administrativo. El seed local conservará su configuración separada y seguirá
@@ -64,8 +69,9 @@ siendo exclusivo para desarrollo/QA.
 - La operación será idempotente para el mismo correo: no duplicará artistas.
 - No se eliminarán clientes, solicitudes ni citas existentes.
 - No se ejecutará automáticamente en cada deploy.
-- La contraseña `1234` se conserva por decisión explícita del producto, aunque
-  queda registrada como riesgo operativo para una futura rotación.
+- La contraseña inicial acordada por el producto se conserva como riesgo
+  operativo y deberá rotarse posteriormente; su valor se mantiene fuera del
+  repositorio y de la documentación versionada.
 
 ## Verificación
 
