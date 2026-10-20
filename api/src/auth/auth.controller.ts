@@ -14,6 +14,7 @@ import {
   ADMIN_SESSION_COOKIE,
   ADMIN_SESSION_TTL_SECONDS,
   readAdminSessionToken,
+  resolveAdminSessionSameSite,
 } from './auth.constants';
 import { LoginDto } from './auth.dto';
 import { AuthService } from './auth.service';
@@ -55,7 +56,7 @@ export class AuthController {
     response.clearCookie(ADMIN_SESSION_COOKIE, {
       httpOnly: true,
       path: '/',
-      sameSite: 'lax',
+      sameSite: resolveAdminSessionSameSite(),
       secure: process.env.NODE_ENV === 'production',
     });
   }
@@ -65,7 +66,7 @@ export class AuthController {
       httpOnly: true,
       maxAge: ADMIN_SESSION_TTL_SECONDS * 1000,
       path: '/',
-      sameSite: 'lax',
+      sameSite: resolveAdminSessionSameSite(),
       secure: process.env.NODE_ENV === 'production',
     });
   }

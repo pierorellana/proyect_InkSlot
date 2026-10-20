@@ -4,6 +4,11 @@ export const ADMIN_SESSION_COOKIE = 'inkslot_session';
 export const ADMIN_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
 export const ADMIN_SESSION_TTL_MS = ADMIN_SESSION_TTL_SECONDS * 1000;
 
+export const resolveAdminSessionSameSite = (
+  env: NodeJS.ProcessEnv = process.env,
+): 'lax' | 'none' =>
+  env.NODE_ENV?.trim().toLowerCase() === 'production' ? 'none' : 'lax';
+
 export const resolveLoginEmail = (
   login: string,
   env: NodeJS.ProcessEnv = process.env,

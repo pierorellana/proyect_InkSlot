@@ -1,4 +1,21 @@
-import { resolveLoginEmail } from './auth.constants';
+import {
+  resolveAdminSessionSameSite,
+  resolveLoginEmail,
+} from './auth.constants';
+
+describe('resolveAdminSessionSameSite', () => {
+  it('allows the deployed Netlify frontend to send the session cookie', () => {
+    expect(resolveAdminSessionSameSite({ NODE_ENV: 'production' })).toBe(
+      'none',
+    );
+  });
+
+  it('keeps local development on lax cookies', () => {
+    expect(resolveAdminSessionSameSite({ NODE_ENV: 'development' })).toBe(
+      'lax',
+    );
+  });
+});
 
 describe('resolveLoginEmail', () => {
   const productionEnv = {

@@ -1,6 +1,6 @@
 # SPEC-AUTH — RF-01
 
-Admin único inicial. `POST /v1/auth/login` con email/password, credenciales hasheadas Argon2id; respuestas genéricas para usuario/clave erróneos; throttle/rate limit y sesión HttpOnly segura. **Decisión ADR-003** usa cookies HttpOnly Secure SameSite con validación de origen para mutaciones; CORS se limita por `CORS_ALLOWED_ORIGINS`.
+Admin único inicial. `POST /v1/auth/login` con email/password, credenciales hasheadas Argon2id; respuestas genéricas para usuario/clave erróneos; throttle/rate limit y sesión HttpOnly segura. **Decisión ADR-003** usa cookies HttpOnly Secure SameSite con validación de origen para mutaciones; CORS se limita por `CORS_ALLOWED_ORIGINS`. Cuando frontend y API están en dominios distintos en producción, la cookie usa `SameSite=None; Secure`; en local usa `SameSite=Lax`.
 
 ## Contratos
 `POST /v1/auth/login`: `{email,password}` → `200 {user:{id,name,role}}` + cookies de sesión; `401 AUTH_INVALID`.
