@@ -22,7 +22,15 @@ reports the PostgreSQL connectivity state.
 
 For the local demo admin, open the Flutter Web hash route
 `/#/admin/login` and use `dodo` / `1234`. These credentials are local demo
-configuration only; production credentials must be provisioned separately.
+configuration only. The `DEMO_*` variables belong exclusively to
+`npm run db:seed` and are not read by runtime login resolution.
+
+Production uses the separate `ADMIN_LOGIN_USERNAME`, `ADMIN_EMAIL` and
+`ADMIN_DISPLAY_NAME` mapping. Configure those non-secret values in the
+deployed API so the login username resolves to the production artist. The
+production password must be supplied out-of-band only to the one-time admin
+bootstrap; do not add it to this file, `.env.example`, the repository or the
+Flutter bundle. Never run `npm run db:seed` against the production database.
 
 ## Checks
 

@@ -9,11 +9,15 @@ export const resolveLoginEmail = (
   env: NodeJS.ProcessEnv = process.env,
 ): string => {
   const normalizedLogin = login.trim().toLowerCase();
-  const demoUsername = env.DEMO_LOGIN_USERNAME?.trim().toLowerCase();
-  const demoEmail = env.DEMO_ARTIST_EMAIL?.trim().toLowerCase();
+  const configuredUsername = env.ADMIN_LOGIN_USERNAME?.trim().toLowerCase();
+  const configuredEmail = env.ADMIN_EMAIL?.trim().toLowerCase();
 
-  if (demoUsername && demoEmail && normalizedLogin === demoUsername) {
-    return demoEmail;
+  if (
+    configuredUsername &&
+    configuredEmail &&
+    normalizedLogin === configuredUsername
+  ) {
+    return configuredEmail;
   }
 
   return normalizedLogin;
