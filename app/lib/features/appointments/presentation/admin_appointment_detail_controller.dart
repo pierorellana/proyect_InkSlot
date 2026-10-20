@@ -11,12 +11,17 @@ enum AdminAppointmentDetailStatus { idle, loading, loaded, error }
 enum AdminAppointmentAction { reschedule, complete, noShow, cancel, retrySync }
 
 class AdminAppointmentDetailController extends ChangeNotifier {
-  AdminAppointmentDetailController(this._repository, {this.sessionController});
+  AdminAppointmentDetailController(
+    this._repository, {
+    this.sessionController,
+    DateTime Function()? now,
+  }) : _now = now ?? DateTime.now;
 
   static const rescheduleHorizonDays = 21;
 
   final AdminAppointmentsRepository _repository;
   final AdminSessionController? sessionController;
+  final DateTime Function() _now;
 
   AdminAppointmentDetailStatus _status = AdminAppointmentDetailStatus.idle;
   AdminAppointmentDetail? _detail;
@@ -72,7 +77,7 @@ class AdminAppointmentDetailController extends ChangeNotifier {
   List<DateTime> rescheduleDays({DateTime? now}) {
     final availability = _availability;
     if (availability == null) return const <DateTime>[];
-    final today = _dateOnly(now ?? DateTime.now());
+    final today = _dateOnly(now ?? _now());
     return [
       for (var i = 0; i < rescheduleHorizonDays; i++)
         if (availability
@@ -87,7 +92,7 @@ class AdminAppointmentDetailController extends ChangeNotifier {
     final availability = _availability;
     final detail = _detail;
     if (availability == null || detail == null) return const <DateTime>[];
-    final clock = now ?? DateTime.now();
+    final clock = now ?? _now();
     final date = _dateOnly(day);
     final step = availability.slotStepMinutes;
     final times = <DateTime>[];

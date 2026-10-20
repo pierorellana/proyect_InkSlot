@@ -55,7 +55,10 @@ void main() {
   group('AdminAppointmentDetailController', () {
     test('loads, mutates and keeps the server detail', () async {
       final repository = FakeRepository();
-      final controller = AdminAppointmentDetailController(repository);
+      final controller = AdminAppointmentDetailController(
+        repository,
+        now: () => DateTime(2026, 10, 19, 8),
+      );
       await controller.load('a1');
       expect(controller.detail!.status, AdminAppointmentStatus.confirmed);
 
