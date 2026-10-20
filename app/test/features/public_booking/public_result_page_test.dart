@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:inkslot_app/core/network/api_client.dart';
 import 'package:inkslot_app/core/network/api_exception.dart';
 import 'package:inkslot_app/core/theme/inkslot_theme.dart';
+import 'package:inkslot_app/core/widgets/inkslot_primary_button.dart';
 import 'package:inkslot_app/features/public_booking/data/public_reservation_repository.dart';
 import 'package:inkslot_app/features/public_booking/domain/public_appointment.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_reservation_controller.dart';
@@ -29,10 +30,22 @@ void main() {
     expect(repository.appointmentCalls, 1);
     expect(find.textContaining('Nos vemos el martes'), findsOneWidget);
     expect(find.text('Ver mi reserva'), findsOneWidget);
-    expect(find.text('Guardar en mi calendario'), findsOneWidget);
+    expect(
+      find.text('Guardar en mi calendario · Próximamente'),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<InkSlotPrimaryButton>(find.byType(InkSlotPrimaryButton))
+          .onPressed,
+      isNull,
+    );
     expect(find.text('Mar 20 oct'), findsOneWidget);
     expect(find.text('10:00 – 13:00'), findsOneWidget);
-    expect(find.textContaining('Estamos terminando de registrarlo'), findsOneWidget);
+    expect(
+      find.textContaining('Estamos terminando de registrarlo'),
+      findsOneWidget,
+    );
 
     await tester.tap(find.text('Ver mi reserva'));
     await tester.pumpAndSettle();
@@ -88,7 +101,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.bySemanticsLabel('Reserva confirmada'), findsOneWidget);
-    expect(find.textContaining('Estamos terminando de registrarlo'), findsOneWidget);
+    expect(
+      find.textContaining('Estamos terminando de registrarlo'),
+      findsOneWidget,
+    );
   });
 }
 

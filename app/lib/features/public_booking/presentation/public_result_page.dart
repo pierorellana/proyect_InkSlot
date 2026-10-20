@@ -180,16 +180,13 @@ class _ResultContent extends StatelessWidget {
                 ),
               ),
               InkSlotPrimaryButton(
-                label: 'Guardar en mi calendario',
+                label: 'Guardar en mi calendario · Próximamente',
                 leading: const InkSlotIcon(
                   InkSlotIcons.calendarioAgregar,
                   size: 18,
                   color: InkSlotColors.ink,
                 ),
-                onPressed: () => showInkSlotToast(
-                  context,
-                  'Evento listo para tu calendario',
-                ),
+                onPressed: null,
               ),
               const SizedBox(height: 10),
               Row(
