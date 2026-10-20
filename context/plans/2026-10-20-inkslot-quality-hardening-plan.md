@@ -18,6 +18,8 @@
 
 ### Task 1: Stabilize Flutter regression fixtures
 
+**Estado:** Completada el 2026-10-20.
+
 **Files:**
 - Modify: `app/test/tool/client_shots_test.dart`
 - Modify: `app/test/tool/client_shots_support.dart` only if a reusable first-day helper is needed
@@ -30,6 +32,8 @@
 - Run the complete Flutter test suite and record any failures that are unrelated to this slice.
 
 ### Task 2: Harden API edge security
+
+**Estado:** Completada el 2026-10-20.
 
 **Files:**
 - Modify: `api/src/main.ts`
@@ -49,6 +53,8 @@
 
 ### Task 3: Add request IDs and structured request logging
 
+**Estado:** Completada el 2026-10-20.
+
 **Files:**
 - Create: `api/src/observability/request-id.middleware.ts`
 - Create: `api/src/observability/observability.module.ts` if the middleware needs module registration
@@ -66,6 +72,8 @@
 
 ### Task 4: Mark client calendar save as future
 
+**Estado:** Completada el 2026-10-20.
+
 **Files:**
 - Modify: `app/lib/features/public_booking/presentation/public_result_page.dart`
 - Modify: `app/test/features/public_booking/public_result_page_test.dart`
@@ -77,6 +85,8 @@
 - Existing confirmation/result states remain unchanged.
 
 ### Task 5: Synchronize SDD documentation
+
+**Estado:** Completada el 2026-10-20.
 
 **Files:**
 - Modify: `context/adr/ADR-002-booking-integrity-and-calendar.md`
@@ -93,6 +103,8 @@
 - `git diff --check` passes.
 
 ### Task 6: Commit and release gate
+
+**Estado:** Parcial: slices funcionales y documentación committeados; CI, OpenAPI versionado, golden/integration y verificación completa de release permanecen pendientes.
 
 - Run focused tests, full tests, analyzer, API build/tests and documentation checks.
 - Separate commits by Flutter regression, API security, observability, public future capability and SDD updates.

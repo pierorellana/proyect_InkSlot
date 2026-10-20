@@ -15,3 +15,7 @@ DB determina si solicitud/cita existe; Calendar bloquea ocupaciones manuales aje
 
 ## AC
 AC-06 integración pendiente visible; AC-09 sin freeBusy no dar disponibilidad; AC-10 fallos recuperables; pérdida de consentimiento → `needs_reconnect` y CTA admin; reintento no crea dos eventos.
+
+## Estado de implementación
+
+OAuth, `freeBusy`, creación/actualización/eliminación, outbox, reintentos, incidencias y reconexión están implementados para el MVP local. Sigue abierta la política de reconciliación cuando el tatuador edita o elimina manualmente un evento, además de la validación OAuth con el dominio final.

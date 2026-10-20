@@ -16,3 +16,7 @@ Cada incremento: leer spec + pruebas → implementación funcional → screensho
 | 9 | Estado/error completo, responsive, golden/e2e, deploy | todas | AC-01..AC-10 + go/no-go |
 
 **Trunk-Based:** ramas cortas, 1 cambio pequeño por PR si aplica; commits por feature (`feat(api): ...`, `feat(web): ...`, `test: ...`, `docs: ...`); nunca un commit masivo que mezcle UI, DB y OAuth sin separación.
+
+## Estado de ejecución — 2026-10-20
+
+Las fases 0–8 tienen implementación funcional documentada en `context/tasks/backlog.md`. La fase 9 queda parcial: se estabilizaron los fixtures Flutter, seguridad HTTP y trazabilidad, pero todavía faltan CI, OpenAPI versionado, golden/integration tests, validación manual de navegadores, deploy y backup/restore. Los planes históricos de cada slice conservan sus checkboxes originales como registro de ejecución; este estado y el backlog son la fuente actualizada.

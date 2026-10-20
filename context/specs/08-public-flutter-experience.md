@@ -9,11 +9,11 @@ Flutter Web + Provider (`ChangeNotifier` por flujo/feature, `Selector`/`Consumer
 - Días: selección `pop`, solo días con huecos completos.
 - Horarios: **rueda curva** con gestos/touch, wheel y flechas; horario activo píldora con glow cobre y contraste legible; horarios vecinos visibles.
 - Revisión: ticket con entrada/tilt 3D (`tkIn`); confirmar con estado cargando.
-- Resultado: stamp, ringOut y check, botón `Ver mi reserva`.
+- Resultado: stamp, ringOut y check, botón `Ver mi reserva`; `Guardar en mi calendario` se muestra deshabilitado como `Próximamente` hasta implementar exportación o integración del calendario del cliente.
 - Admin: login, home, nueva solicitud, enlace, listas/detalles, agenda, sheets y toasts.
 
 ## Estados obligatorios
-`activo`, `vencido (410)`, `cancelado`, `agendado`, `sin_horarios`, `sin_red`, `error_agenda`, `conflicto (409)`, `sincronizacion=pendiente`, loader de horarios, loader al confirmar, error de login, `calendario=reconectar`, incidente sync/resuelto. Implementar mensajes/CTA apropiados; no replicar datos mock como definitivos.
+`activo`, `vencido (410)`, `cancelado`, `agendado`, `sin_horarios`, `sin_red`, `error_agenda`, `conflicto (409)`, `sincronizacion=pendiente`, loader de horarios, loader al confirmar, error de login, `calendario=reconectar`, incidente sync/resuelto y calendario del cliente futuro. Implementar mensajes/CTA apropiados; no replicar datos mock como definitivos.
 
 ## Tokens exactos
 `#0A0A0B` tinta, `#050505` profundo, `#131315` superficie, `#EEE9E0` hueso, `#9B968E` ceniza, `#C87939` cobre, `#D48A45` cobre claro, `#241A12` tabaco; semánticos `#8FBF9A` éxito, `#E6C77A` aviso, `#E2604C` error. Tipos: Instrument Serif, Geist, Geist Mono; archivos origen `assets/fuentes/*` del ZIP (consultar licencia; **no redistribuir** en docs). Estilos y medidas concretas en tokens.json.
