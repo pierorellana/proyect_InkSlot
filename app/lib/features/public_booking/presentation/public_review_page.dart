@@ -424,7 +424,6 @@ class _ReviewTicketState extends State<_ReviewTicket>
     final slot = widget.slot;
     final timezone = reservation.timezone;
     final date = publicDateParts(slot.startAt, timezone);
-    final zone = publicZoneDescription(timezone).replaceFirst('hora de ', '');
     return Semantics(
       container: true,
       label: 'Ticket de revisión para ${reservation.artistDisplayName}',
@@ -530,22 +529,11 @@ class _ReviewTicketState extends State<_ReviewTicket>
                             ),
                           ),
                           const SizedBox(width: 14),
-                          Expanded(child: _TicketField('Zona', zone)),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
                           Expanded(
                             child: _TicketField(
                               'Artista',
                               reservation.artistDisplayName,
                             ),
-                          ),
-                          const SizedBox(width: 14),
-                          const Expanded(
-                            child: _TicketField('Estudio', 'Dodogio'),
                           ),
                         ],
                       ),

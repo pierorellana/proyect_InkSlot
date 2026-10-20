@@ -496,11 +496,6 @@ class _DetailsCard extends StatelessWidget {
               '${formatPublicTime(data.startAt, data.timezone)} – '
                   '${formatPublicTime(data.endAt, data.timezone)}',
             ),
-            const InkSlotSep(indent: 20),
-            _DetailRow(
-              'Zona',
-              publicZoneDescription(data.timezone).replaceFirst('hora de ', ''),
-            ),
           ],
         ),
       ),

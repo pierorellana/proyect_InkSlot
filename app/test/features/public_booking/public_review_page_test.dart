@@ -36,6 +36,8 @@ void main() {
     expect(find.text('Mar 20'), findsOneWidget);
     expect(find.text('10:00'), findsOneWidget);
     expect(find.text('13:00'), findsOneWidget);
+    expect(find.text('Zona'), findsNothing);
+    expect(find.text('Estudio'), findsNothing);
     expect(find.text('Confirmar cita'), findsOneWidget);
 
     await tester.tap(find.text('Confirmar cita'));
@@ -97,7 +99,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ese horario se acaba de ocupar'), findsOneWidget);
-    expect(find.textContaining('Otra persona confirmó las 10:00'), findsOneWidget);
+    expect(
+      find.textContaining('Otra persona confirmó las 10:00'),
+      findsOneWidget,
+    );
     expect(find.text('Reintentar'), findsNothing);
     await tester.tap(find.text('Ver horarios actualizados'));
     expect(returned, isTrue);

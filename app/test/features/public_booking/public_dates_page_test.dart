@@ -52,6 +52,7 @@ void main() {
     expect(find.byType(PublicTimeWheel), findsOneWidget);
     expect(find.text('10:00'), findsWidgets);
     expect(find.text('1 de 1 horarios libres'.toUpperCase()), findsOneWidget);
+    expect(find.textContaining('hora de Ecuador'), findsNothing);
 
     await tester.tap(find.text('10:00').first);
     await tester.pumpAndSettle();
@@ -59,7 +60,9 @@ void main() {
     expect(reviewed?.startAt, DateTime.utc(2026, 10, 23, 15));
   });
 
-  testWidgets('back from the time step returns to the calendar', (tester) async {
+  testWidgets('back from the time step returns to the calendar', (
+    tester,
+  ) async {
     final today = _dateOnly(DateTime.now());
     final controller = PublicReservationController(
       _FakeRepository(

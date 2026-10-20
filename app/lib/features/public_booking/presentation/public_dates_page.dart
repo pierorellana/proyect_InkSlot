@@ -213,7 +213,6 @@ class _PublicDatesPageState extends State<PublicDatesPage> {
         safe: safe,
         date: _pickedDate!,
         reservation: reservation,
-        timezone: timezone,
         onBack: _goBack,
         body: const _TimeLoading(),
       );
@@ -223,7 +222,6 @@ class _PublicDatesPageState extends State<PublicDatesPage> {
         safe: safe,
         date: day.date,
         reservation: reservation,
-        timezone: timezone,
         onBack: _goBack,
         body: _TimeBody(
           slots: day.slots,
@@ -588,7 +586,6 @@ class _TimeScreen extends StatelessWidget {
     required this.safe,
     required this.date,
     required this.reservation,
-    required this.timezone,
     required this.onBack,
     required this.body,
   });
@@ -596,7 +593,6 @@ class _TimeScreen extends StatelessWidget {
   final EdgeInsets safe;
   final DateTime date;
   final PublicReservation reservation;
-  final String timezone;
   final VoidCallback onBack;
   final Widget body;
 
@@ -629,8 +625,7 @@ class _TimeScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Sesión de ${publicDurationShort(reservation.durationMinutes)}'
-                  ' · ${publicZoneDescription(timezone)}',
+                  'Sesión de ${publicDurationShort(reservation.durationMinutes)}',
                   style: const TextStyle(
                     color: InkSlotColors.secondary,
                     fontSize: 14,
