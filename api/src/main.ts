@@ -9,6 +9,8 @@ import {
   originValidationMiddleware,
   securityHeadersMiddleware,
 } from './security/security.middleware';
+import { RequestIdExceptionFilter } from './observability/request-id.exception-filter';
+import { requestIdMiddleware } from './observability/request-id.middleware';
 
 type CorsOriginCallback = (error: Error | null, allow?: boolean) => void;
 
@@ -17,8 +19,10 @@ async function bootstrap() {
   const security = readSecurityConfig();
   app.enableShutdownHooks();
   app.setGlobalPrefix('v1');
+  app.use(requestIdMiddleware);
   app.use(securityHeadersMiddleware(security));
   app.use(originValidationMiddleware(security));
+  app.useGlobalFilters(new RequestIdExceptionFilter());
   app.enableCors({
     origin: (origin: string | undefined, callback: CorsOriginCallback) => {
       callback(null, isCorsOriginAllowed(origin, security));
