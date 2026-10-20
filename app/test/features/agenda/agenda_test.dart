@@ -171,7 +171,7 @@ void main() {
       return controller;
     }
 
-    testWidgets('renders the connected calendar, week and rules', (
+    testWidgets('renders the connected calendar, week and blocks', (
       tester,
     ) async {
       await pump(tester, FakeAgendaRepository());
@@ -181,7 +181,8 @@ void main() {
       expect(find.text('Desconectar'), findsOneWidget);
       expect(find.text('09:00 - 18:00'), findsOneWidget);
       expect(find.text('Cerrado'), findsNWidgets(6));
-      expect(find.text('America/Guayaquil'), findsOneWidget);
+      expect(find.text('Reglas de reserva'), findsNothing);
+      expect(find.text('America/Guayaquil'), findsNothing);
       expect(
         find.text('Sin bloqueos. Agrega vacaciones, feriados o descansos.'),
         findsOneWidget,

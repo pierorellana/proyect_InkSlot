@@ -206,35 +206,6 @@ class _AdminAgendaPageState extends State<AdminAgendaPage> {
                 ],
               ),
       ),
-      const InkSlotSectionHeader(
-        title: 'Reglas de reserva',
-        titleSize: 16,
-        titleWeight: FontWeight.w600,
-      ),
-      InkSlotCard(
-        child: Column(
-          children: [
-            _RuleRow(
-              'Intervalo de inicio',
-              '${availability.slotStepMinutes} min',
-            ),
-            const InkSlotSep(),
-            _RuleRow(
-              'Anticipación mínima',
-              '${availability.minimumNoticeHours} h',
-            ),
-            const InkSlotSep(),
-            _RuleRow('Horizonte', '${availability.horizonDays} días'),
-            const InkSlotSep(),
-            _RuleRow(
-              'Margen entre sesiones',
-              '${availability.bufferMinutes} min',
-            ),
-            const InkSlotSep(),
-            _RuleRow('Zona horaria', availability.timezone),
-          ],
-        ),
-      ),
     ];
   }
 }
@@ -492,40 +463,6 @@ class _BlockRow extends StatelessWidget {
           ),
         ],
       ),
-    ),
-  );
-}
-
-class _RuleRow extends StatelessWidget {
-  const _RuleRow(this.label, this.value);
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
-    child: Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Flexible(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: InkSlotColors.secondary,
-              fontSize: 15,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(color: InkSlotColors.bone, fontSize: 15),
-          ),
-        ),
-      ],
     ),
   );
 }
