@@ -32,6 +32,43 @@ production password must be supplied out-of-band only to the one-time admin
 bootstrap; do not add it to this file, `.env.example`, the repository or the
 Flutter bundle. Never run `npm run db:seed` against the production database.
 
+## Production admin bootstrap
+
+The first production administrator is provisioned once with the dedicated CLI.
+Run it from the API service working directory connected to the production
+database; do not invoke it as part of `start:prod` or a normal deploy.
+
+1. In the Render service environment, keep these non-secret variables
+   configured persistently:
+
+   ```text
+   ADMIN_LOGIN_USERNAME
+   ADMIN_EMAIL
+   ADMIN_DISPLAY_NAME
+   ```
+
+2. Add `ADMIN_PASSWORD` and `ADMIN_BOOTSTRAP_CONFIRM` temporarily through the
+   Render environment/secrets UI. Do not place either value in this README,
+   `.env.example`, the repository, shell history or a Flutter build.
+
+3. Run the command without putting secrets in the command line:
+
+   ```bash
+   npm run db:bootstrap-admin
+   ```
+
+   The command validates the complete production configuration, hashes the
+   password with Argon2id and performs an idempotent artist upsert. It does not
+   create demo clients, requests, tokens, appointments or availability rows.
+
+4. After the command succeeds, verify the production login and then remove
+   `ADMIN_PASSWORD` and `ADMIN_BOOTSTRAP_CONFIRM` from Render immediately.
+   Keep only the three non-secret mapping variables so `dodo` continues to
+   resolve to the provisioned artist.
+
+5. Never use `npm run db:seed` against Neon or any other production database.
+   That command is reserved for the local development/QA fixture.
+
 ## Checks
 
 ```bash

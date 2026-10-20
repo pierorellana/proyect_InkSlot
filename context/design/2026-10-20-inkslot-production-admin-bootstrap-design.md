@@ -1,7 +1,7 @@
 # InkSlot — bootstrap del administrador productivo
 
 **Fecha:** 2026-10-20  
-**Estado:** Aprobada para implementación
+**Estado:** Implementada y verificada
 **Alcance:** Provisionar el primer administrador productivo sin cargar datos demo.
 
 ## Objetivo
@@ -93,9 +93,21 @@ Se cubrirá lo siguiente:
 - Cambio de la contraseña inicial.
 - Panel administrativo adicional para gestionar administradores.
 
-## Evidencia esperada
+## Evidencia verificada — 2026-10-20
 
-- Pruebas unitarias del bootstrap y resolución de login.
-- Verificación contra la base Neon sin datos demo.
-- Migraciones previamente aplicadas con `prisma migrate deploy`.
-- Commit independiente para el bootstrap productivo y su documentación.
+- Las 7 migraciones de Prisma fueron aplicadas y `prisma migrate status`
+  reportó el esquema actualizado.
+- El bootstrap productivo se ejecutó dos veces de forma idempotente, sin
+  duplicar el artista.
+- La verificación en Neon confirmó 1 artista activo y 0 filas en
+  `studio_settings`, `clients`, `booking_requests`, `booking_tokens`,
+  `appointments`, `weekly_availability` y `availability_blocks`.
+- El build de la API fue aprobado.
+- Las 13 pruebas enfocadas del bootstrap, configuración y resolución de login
+  fueron aprobadas.
+- El login con `dodo` y la consulta `/auth/me` devolvieron `200` con
+  `Dodogio`; una contraseña incorrecta devolvió `AUTH_INVALID` con `401`.
+- `start:prod` quedó corregido para iniciar desde `dist/src/main.js`.
+- La documentación operativa del provisioning quedó actualizada sin incluir
+  contraseñas, cadenas de conexión, secretos OAuth, cookies de sesión,
+  identificadores internos ni request IDs.
