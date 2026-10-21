@@ -140,28 +140,23 @@ class _DetailScaffold extends StatelessWidget {
     return AdminScaleIn(
       child: SingleChildScrollView(
         padding: EdgeInsets.fromLTRB(20, top < 58 ? 58 : top, 20, 120),
-        child: Align(
-          alignment: Alignment.topCenter,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    InkSlotIconButton(
-                      icon: InkSlotIcons.volver,
-                      semanticLabel: 'Volver a solicitudes',
-                      onPressed: onBack,
-                    ),
-                    if (status != null)
-                      BookingRequestStatusChip(status: status!),
-                  ],
-                ),
-                ...children,
-              ],
-            ),
+        child: AdminPageFrame(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  InkSlotIconButton(
+                    icon: InkSlotIcons.volver,
+                    semanticLabel: 'Volver a solicitudes',
+                    onPressed: onBack,
+                  ),
+                  if (status != null) BookingRequestStatusChip(status: status!),
+                ],
+              ),
+              ...children,
+            ],
           ),
         ),
       ),

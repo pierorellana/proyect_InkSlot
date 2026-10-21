@@ -59,97 +59,101 @@ class _SyncIssuesPageState extends State<SyncIssuesPage> {
               20,
               40 + media.padding.bottom,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: InkSlotIconButton(
-                    icon: InkSlotIcons.volver,
-                    semanticLabel: 'Volver',
-                    onPressed: () => context.go('/admin'),
+            child: AdminPageFrame(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: InkSlotIconButton(
+                      icon: InkSlotIcons.volver,
+                      semanticLabel: 'Volver',
+                      onPressed: () => context.go('/admin'),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 22),
-                AdminScaleRise(
-                  duration: const Duration(milliseconds: 650),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'SINCRONIZACIÓN',
-                        style: inkSlotMono(color: InkSlotColors.tertiary),
+                  const SizedBox(height: 22),
+                  AdminScaleRise(
+                    duration: const Duration(milliseconds: 650),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'SINCRONIZACIÓN',
+                          style: inkSlotMono(color: InkSlotColors.tertiary),
+                        ),
+                        const SizedBox(height: 8),
+                        Text('Incidencias', style: inkSlotSerif(42)),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Revisa y reintenta operaciones pendientes de Calendar.',
+                          style: TextStyle(
+                            color: Color(0xFF9B968E),
+                            fontSize: 14,
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  AdminScaleRise(
+                    delay: const Duration(milliseconds: 60),
+                    duration: const Duration(milliseconds: 650),
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        InkSlotChip(
+                          label: 'Abiertas',
+                          selected: controller.filter == SyncIssueStatus.open,
+                          onTap: () =>
+                              controller.setFilter(SyncIssueStatus.open),
+                        ),
+                        InkSlotChip(
+                          label: 'Resueltas',
+                          selected:
+                              controller.filter == SyncIssueStatus.resolved,
+                          onTap: () =>
+                              controller.setFilter(SyncIssueStatus.resolved),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (initialLoading)
+                    const _LoadingState()
+                  else if (controller.status == SyncIssuesListStatus.error &&
+                      controller.items.isEmpty)
+                    _ErrorState(
+                      message:
+                          controller.errorMessage ??
+                          'No se pudieron cargar las incidencias.',
+                      onRetry: () => controller.load(refresh: true),
+                    )
+                  else if (controller.items.isEmpty)
+                    const _EmptyState()
+                  else ...[
+                    if (controller.errorMessage != null) ...[
+                      _InlineError(
+                        message: controller.errorMessage!,
+                        onRetry: () => controller.load(refresh: true),
                       ),
-                      const SizedBox(height: 8),
-                      Text('Incidencias', style: inkSlotSerif(42)),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Revisa y reintenta operaciones pendientes de Calendar.',
-                        style: TextStyle(
-                          color: Color(0xFF9B968E),
-                          fontSize: 14,
-                          height: 1.45,
+                      const SizedBox(height: 14),
+                    ],
+                    for (final issue in controller.items)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _IssueCard(
+                          issue: issue,
+                          retrying: controller.retryingId == issue.id,
+                          onRetry: issue.status == SyncIssueStatus.open
+                              ? () => _retry(issue.id)
+                              : null,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                AdminScaleRise(
-                  delay: const Duration(milliseconds: 60),
-                  duration: const Duration(milliseconds: 650),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      InkSlotChip(
-                        label: 'Abiertas',
-                        selected: controller.filter == SyncIssueStatus.open,
-                        onTap: () => controller.setFilter(SyncIssueStatus.open),
-                      ),
-                      InkSlotChip(
-                        label: 'Resueltas',
-                        selected: controller.filter == SyncIssueStatus.resolved,
-                        onTap: () =>
-                            controller.setFilter(SyncIssueStatus.resolved),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 18),
-                if (initialLoading)
-                  const _LoadingState()
-                else if (controller.status == SyncIssuesListStatus.error &&
-                    controller.items.isEmpty)
-                  _ErrorState(
-                    message:
-                        controller.errorMessage ??
-                        'No se pudieron cargar las incidencias.',
-                    onRetry: () => controller.load(refresh: true),
-                  )
-                else if (controller.items.isEmpty)
-                  const _EmptyState()
-                else ...[
-                  if (controller.errorMessage != null) ...[
-                    _InlineError(
-                      message: controller.errorMessage!,
-                      onRetry: () => controller.load(refresh: true),
-                    ),
-                    const SizedBox(height: 14),
                   ],
-                  for (final issue in controller.items)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _IssueCard(
-                        issue: issue,
-                        retrying: controller.retryingId == issue.id,
-                        onRetry: issue.status == SyncIssueStatus.open
-                            ? () => _retry(issue.id)
-                            : null,
-                      ),
-                    ),
                 ],
-              ],
+              ),
             ),
           );
         },

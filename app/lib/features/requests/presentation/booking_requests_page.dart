@@ -56,100 +56,95 @@ class _BookingRequestsPageState extends State<BookingRequestsPage> {
       return AdminScaleIn(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, top < 58 ? 58 : top, 20, 120),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AdminScaleRise.step(
-                    0,
-                    child: _Header(
-                      onCreate: () => context.go('/admin/requests/new'),
-                    ),
+          child: AdminPageFrame(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AdminScaleRise.step(
+                  0,
+                  child: _Header(
+                    onCreate: () => context.go('/admin/requests/new'),
                   ),
-                  const SizedBox(height: 18),
-                  AdminScaleRise.step(
-                    1,
-                    child: _FilterBar(
-                      selected: filter,
-                      count: initialLoading || controller.listError != null
-                          ? null
-                          : items.length,
-                      more: controller.nextCursor != null,
-                      onChanged: _changeFilter,
-                    ),
+                ),
+                const SizedBox(height: 18),
+                AdminScaleRise.step(
+                  1,
+                  child: _FilterBar(
+                    selected: filter,
+                    count: initialLoading || controller.listError != null
+                        ? null
+                        : items.length,
+                    more: controller.nextCursor != null,
+                    onChanged: _changeFilter,
                   ),
-                  const SizedBox(height: 18),
-                  if (initialLoading)
-                    const InkSlotSkeletonRows(count: 4)
-                  else if (controller.listStatus ==
-                          BookingRequestsListStatus.error &&
-                      !hasItems)
-                    InkSlotStateBlock(
-                      icon: InkSlotIcons.sinConexion,
-                      title: 'No pudimos cargar tus solicitudes.',
-                      body:
-                          controller.listError ??
-                          'No se pudieron cargar las solicitudes.',
-                      actionLabel: 'Reintentar',
-                      onAction: reload,
-                    )
-                  else if (items.isEmpty)
-                    InkSlotStateBlock(
-                      icon: InkSlotIcons.enlace,
-                      title: controller.nextCursor != null
-                          ? 'Sigue buscando.'
-                          : _emptyTitle(filter),
-                      body: controller.nextCursor != null
-                          ? 'Hay más solicitudes por cargar.'
-                          : _emptyDescription(filter),
-                      actionLabel: controller.nextCursor != null
-                          ? 'Cargar más'
-                          : filter == BookingRequestsFilter.pending
-                          ? 'Nueva solicitud'
-                          : null,
-                      onAction: controller.nextCursor != null
-                          ? controller.loadMore
-                          : () => context.go('/admin/requests/new'),
-                    )
-                  else ...[
-                    if (controller.listError != null) ...[
-                      _InlineError(
-                        message: controller.listError!,
-                        onRetry: reload,
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    AdminScaleRise.step(
-                      2,
-                      child: InkSlotCard(
-                        child: Column(
-                          children: [
-                            for (var i = 0; i < items.length; i++) ...[
-                              if (i > 0) const InkSlotSep(indent: 0),
-                              BookingRequestCard(
-                                request: items[i],
-                                onTap: () => context.go(
-                                  '/admin/requests/${items[i].id}',
-                                ),
-                              ),
-                            ],
+                ),
+                const SizedBox(height: 18),
+                if (initialLoading)
+                  const InkSlotSkeletonRows(count: 4)
+                else if (controller.listStatus ==
+                        BookingRequestsListStatus.error &&
+                    !hasItems)
+                  InkSlotStateBlock(
+                    icon: InkSlotIcons.sinConexion,
+                    title: 'No pudimos cargar tus solicitudes.',
+                    body:
+                        controller.listError ??
+                        'No se pudieron cargar las solicitudes.',
+                    actionLabel: 'Reintentar',
+                    onAction: reload,
+                  )
+                else if (items.isEmpty)
+                  InkSlotStateBlock(
+                    icon: InkSlotIcons.enlace,
+                    title: controller.nextCursor != null
+                        ? 'Sigue buscando.'
+                        : _emptyTitle(filter),
+                    body: controller.nextCursor != null
+                        ? 'Hay más solicitudes por cargar.'
+                        : _emptyDescription(filter),
+                    actionLabel: controller.nextCursor != null
+                        ? 'Cargar más'
+                        : filter == BookingRequestsFilter.pending
+                        ? 'Nueva solicitud'
+                        : null,
+                    onAction: controller.nextCursor != null
+                        ? controller.loadMore
+                        : () => context.go('/admin/requests/new'),
+                  )
+                else ...[
+                  if (controller.listError != null) ...[
+                    _InlineError(
+                      message: controller.listError!,
+                      onRetry: reload,
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  AdminScaleRise.step(
+                    2,
+                    child: InkSlotCard(
+                      child: Column(
+                        children: [
+                          for (var i = 0; i < items.length; i++) ...[
+                            if (i > 0) const InkSlotSep(indent: 0),
+                            BookingRequestCard(
+                              request: items[i],
+                              onTap: () =>
+                                  context.go('/admin/requests/${items[i].id}'),
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
-                    if (controller.nextCursor != null) ...[
-                      const SizedBox(height: 16),
-                      InkSlotGhostButton(
-                        label: loading ? 'Cargando…' : 'Cargar más',
-                        onPressed: loading ? null : controller.loadMore,
-                      ),
-                    ],
+                  ),
+                  if (controller.nextCursor != null) ...[
+                    const SizedBox(height: 16),
+                    InkSlotGhostButton(
+                      label: loading ? 'Cargando…' : 'Cargar más',
+                      onPressed: loading ? null : controller.loadMore,
+                    ),
                   ],
                 ],
-              ),
+              ],
             ),
           ),
         ),

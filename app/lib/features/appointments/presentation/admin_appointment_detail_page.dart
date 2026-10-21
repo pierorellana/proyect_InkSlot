@@ -122,12 +122,8 @@ class _AdminAppointmentDetailPageState
                 ),
                 sliver: SliverFillRemaining(
                   hasScrollBody: false,
-                  child: Align(
-                    alignment: Alignment.topCenter,
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 640),
-                      child: _content(context, detail, loaded),
-                    ),
+                  child: AdminPageFrame(
+                    child: _content(context, detail, loaded),
                   ),
                 ),
               ),

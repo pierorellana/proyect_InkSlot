@@ -88,20 +88,16 @@ class _AdminAgendaPageState extends State<AdminAgendaPage> {
         animation: controller,
         builder: (context, _) => SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, top, 20, 120),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AdminScaleRise.step(
-                    0,
-                    child: Text('Agenda', style: inkSlotSerif(42)),
-                  ),
-                  ..._body(),
-                ],
-              ),
+          child: AdminPageFrame(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AdminScaleRise.step(
+                  0,
+                  child: Text('Agenda', style: inkSlotSerif(42)),
+                ),
+                ..._body(),
+              ],
             ),
           ),
         ),

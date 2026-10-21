@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/layout/inkslot_breakpoints.dart';
 import '../../../core/theme/inkslot_tokens.dart';
 import '../../../core/widgets/inkslot_icon.dart';
 import '../../../core/widgets/inkslot_kit.dart';
@@ -77,8 +78,10 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
-    final isDesktop = media.size.width >= 860;
-    final topInset = isDesktop ? adminPageTopInset(context) : 0.0;
+    final screenClass = inkSlotScreenClassForWidth(media.size.width);
+    final topInset = screenClass == InkSlotScreenClass.compact
+        ? 0.0
+        : adminPageTopInset(context);
     return AdminScaleIn(
       duration: const Duration(milliseconds: 550),
       child: AnimatedBuilder(
@@ -323,21 +326,34 @@ class _PendingRow extends StatelessWidget {
   final List<BookingRequest> requests;
 
   @override
-  Widget build(BuildContext context) => SingleChildScrollView(
-    scrollDirection: Axis.horizontal,
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          for (final request in requests) ...[
-            _PendingCard(request: request),
-            const SizedBox(width: 12),
-          ],
-          const _NewRequestCard(),
-        ],
-      ),
-    ),
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final cards = <Widget>[
+        for (final request in requests) _PendingCard(request: request),
+        const _NewRequestCard(),
+      ];
+      if (constraints.maxWidth >= 720) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Wrap(spacing: 12, runSpacing: 12, children: cards),
+        );
+      }
+      return SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(width: 12),
+                cards[i],
+              ],
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 

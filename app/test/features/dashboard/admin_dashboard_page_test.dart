@@ -54,6 +54,25 @@ void main() {
     );
   });
 
+  testWidgets('adapts the dashboard to a tablet viewport without overflow', (
+    tester,
+  ) async {
+    final controller = AdminDashboardController(
+      FakeDashboardRepository(() async => _dashboard()),
+    );
+    addTearDown(controller.dispose);
+    tester.view
+      ..physicalSize = const Size(768, 1024)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    await tester.pumpWidget(_host(AdminDashboardPage(controller: controller)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Próximas citas'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('shows a loading state while the dashboard is pending', (
     tester,
   ) async {

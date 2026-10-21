@@ -60,83 +60,79 @@ class _AdminAppointmentsPageState extends State<AdminAppointmentsPage> {
       return AdminScaleIn(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(20, top, 20, 120),
-          child: Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 640),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  AdminScaleRise.step(
-                    0,
-                    child: Text('Citas', style: inkSlotSerif(42)),
+          child: AdminPageFrame(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                AdminScaleRise.step(
+                  0,
+                  child: Text('Citas', style: inkSlotSerif(42)),
+                ),
+                const SizedBox(height: 18),
+                AdminScaleRise.step(
+                  1,
+                  child: _FilterBar(
+                    selected: controller.filter,
+                    onChanged: controller.setFilter,
                   ),
-                  const SizedBox(height: 18),
-                  AdminScaleRise.step(
-                    1,
-                    child: _FilterBar(
-                      selected: controller.filter,
-                      onChanged: controller.setFilter,
+                ),
+                const SizedBox(height: 18),
+                if (initialLoading)
+                  const InkSlotSkeletonRows(count: 4, avatar: 52)
+                else if (controller.status == AdminAppointmentsStatus.error &&
+                    !hasItems)
+                  InkSlotStateBlock(
+                    icon: InkSlotIcons.sinConexion,
+                    title: 'No pudimos cargar tus citas.',
+                    body:
+                        controller.errorMessage ??
+                        'No se pudieron cargar las citas.',
+                    actionLabel: 'Reintentar',
+                    onAction: () => controller.load(refresh: true),
+                  )
+                else if (controller.status == AdminAppointmentsStatus.empty)
+                  InkSlotStateBlock(
+                    icon: InkSlotIcons.calendarioVacio,
+                    title:
+                        'No hay citas ${_emptyFilterLabel(controller.filter)}.',
+                    body:
+                        'Las citas que coincidan con este filtro aparecerán aquí.',
+                  )
+                else ...[
+                  if (controller.errorMessage != null) ...[
+                    _InlineError(
+                      message: controller.errorMessage!,
+                      onRetry: () => controller.load(refresh: true),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  if (initialLoading)
-                    const InkSlotSkeletonRows(count: 4, avatar: 52)
-                  else if (controller.status == AdminAppointmentsStatus.error &&
-                      !hasItems)
-                    InkSlotStateBlock(
-                      icon: InkSlotIcons.sinConexion,
-                      title: 'No pudimos cargar tus citas.',
-                      body:
-                          controller.errorMessage ??
-                          'No se pudieron cargar las citas.',
-                      actionLabel: 'Reintentar',
-                      onAction: () => controller.load(refresh: true),
-                    )
-                  else if (controller.status == AdminAppointmentsStatus.empty)
-                    InkSlotStateBlock(
-                      icon: InkSlotIcons.calendarioVacio,
-                      title:
-                          'No hay citas ${_emptyFilterLabel(controller.filter)}.',
-                      body:
-                          'Las citas que coincidan con este filtro aparecerán aquí.',
-                    )
-                  else ...[
-                    if (controller.errorMessage != null) ...[
-                      _InlineError(
-                        message: controller.errorMessage!,
-                        onRetry: () => controller.load(refresh: true),
-                      ),
-                      const SizedBox(height: 14),
-                    ],
-                    AdminScaleRise.step(
-                      2,
-                      child: InkSlotCard(
-                        child: Column(
-                          children: [
-                            for (var i = 0; i < items.length; i++) ...[
-                              if (i > 0) const InkSlotSep(indent: 0),
-                              AdminAppointmentCard(
-                                appointment: items[i],
-                                onTap: () => context.go(
-                                  '/admin/appointments/${Uri.encodeComponent(items[i].id)}',
-                                ),
+                    const SizedBox(height: 14),
+                  ],
+                  AdminScaleRise.step(
+                    2,
+                    child: InkSlotCard(
+                      child: Column(
+                        children: [
+                          for (var i = 0; i < items.length; i++) ...[
+                            if (i > 0) const InkSlotSep(indent: 0),
+                            AdminAppointmentCard(
+                              appointment: items[i],
+                              onTap: () => context.go(
+                                '/admin/appointments/${Uri.encodeComponent(items[i].id)}',
                               ),
-                            ],
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
-                    if (controller.nextCursor != null) ...[
-                      const SizedBox(height: 16),
-                      InkSlotGhostButton(
-                        label: loading ? 'Cargando…' : 'Cargar más',
-                        onPressed: loading ? null : controller.loadMore,
-                      ),
-                    ],
+                  ),
+                  if (controller.nextCursor != null) ...[
+                    const SizedBox(height: 16),
+                    InkSlotGhostButton(
+                      label: loading ? 'Cargando…' : 'Cargar más',
+                      onPressed: loading ? null : controller.loadMore,
+                    ),
                   ],
                 ],
-              ),
+              ],
             ),
           ),
         ),
