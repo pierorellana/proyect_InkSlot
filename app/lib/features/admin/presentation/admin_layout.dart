@@ -15,15 +15,16 @@ class AdminPageFrame extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) => Align(
+  Widget build(BuildContext context) {
+    final windowWidth = MediaQuery.sizeOf(context).width;
+    return Align(
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: adminPageMaxWidthFor(constraints.maxWidth),
+          maxWidth: adminPageMaxWidthFor(windowWidth),
         ),
         child: child,
       ),
-    ),
-  );
+    );
+  }
 }
