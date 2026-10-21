@@ -1,4 +1,10 @@
+[[redirects]]
+  from = "/v1/*"
+  to = "https://proyect-inkslot.onrender.com/v1/:splat"
+  status = 200
+  force = true
+
 [build]
   base = "app"
   publish = "build/web"
-  command = 'if [ ! -x .flutter/bin/flutter ]; then git clone --depth 1 --branch 3.47.5 https://github.com/flutter/flutter.git .flutter; fi && export PATH="$PWD/.flutter/bin:$PATH" && flutter config --enable-web && flutter pub get && flutter build web --release --dart-define=API_BASE_URL=https://proyect-inkslot.onrender.com/v1'
+  command = 'if [ ! -x .flutter/bin/flutter ]; then git clone --depth 1 --branch 3.47.5 https://github.com/flutter/flutter.git .flutter; fi && export PATH="$PWD/.flutter/bin:$PATH" && flutter config --enable-web && flutter pub get && flutter build web --release --dart-define=API_BASE_URL=https://inkslot-app.netlify.app/v1'
