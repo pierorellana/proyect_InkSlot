@@ -54,6 +54,27 @@ void main() {
     );
   });
 
+  test(
+    'joins protected production paths through the Netlify same origin',
+    () async {
+      final client = RecordingHttpClient((request) async {
+        expect(
+          request.url,
+          Uri.parse('https://inkslot-app.netlify.app/v1/auth/me'),
+        );
+        return http.Response('{"user":{"id":"artist-1"}}', 200);
+      });
+      final api = HttpApiClient(
+        client: client,
+        baseUri: Uri.parse('https://inkslot-app.netlify.app/v1'),
+      );
+
+      expect(await api.getJson('/auth/me'), {
+        'user': {'id': 'artist-1'},
+      });
+    },
+  );
+
   test('posts JSON and accepts an empty successful response', () async {
     final client = RecordingHttpClient((request) async {
       expect(request.method, 'POST');
