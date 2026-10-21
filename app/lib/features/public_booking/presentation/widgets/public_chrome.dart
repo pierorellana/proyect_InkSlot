@@ -11,6 +11,7 @@ import '../public_reservation_controller.dart';
 import '../public_studio_link.dart';
 
 const publicMaxWidth = 560.0;
+const publicTabletMaxWidth = 760.0;
 
 /// Marco de pantalla del cliente: fondo tinta, entrada `scrIn`, grano y
 /// ancho acotado con las zonas seguras de referencia (58 / 34).
@@ -27,11 +28,18 @@ class PublicScreen extends StatelessWidget {
       top: math.max(padding.top, InkSlotSpacing.safeAreaTopReference),
       bottom: math.max(padding.bottom, InkSlotSpacing.safeAreaBottomReference),
     );
-    Widget content = Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: publicMaxWidth),
-        child: builder(context, safe),
-      ),
+    Widget content = LayoutBuilder(
+      builder: (context, constraints) {
+        final maxWidth = constraints.maxWidth < 600
+            ? publicMaxWidth
+            : publicTabletMaxWidth;
+        return Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: maxWidth),
+            child: builder(context, safe),
+          ),
+        );
+      },
     );
     if (animateIn) content = InkSlotScreenIn(child: content);
     return Scaffold(

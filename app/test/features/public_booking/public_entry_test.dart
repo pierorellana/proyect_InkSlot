@@ -10,10 +10,41 @@ import 'package:inkslot_app/features/public_booking/presentation/public_entry_co
 import 'package:inkslot_app/features/public_booking/presentation/public_reservation_controller.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_splash_page.dart';
 import 'package:inkslot_app/features/public_booking/presentation/public_welcome_page.dart';
+import 'package:inkslot_app/features/public_booking/presentation/widgets/public_chrome.dart';
 import 'package:provider/provider.dart';
 import 'package:inkslot_app/core/network/api_client.dart';
 
 void main() {
+  testWidgets('expands the public frame on tablet widths', (tester) async {
+    tester.view
+      ..physicalSize = const Size(390, 844)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    const key = ValueKey('public-frame-content');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildInkSlotTheme(),
+        home: PublicScreen(
+          animateIn: false,
+          builder: (context, safe) =>
+              const SizedBox(key: key, width: double.infinity, height: 20),
+        ),
+      ),
+    );
+    await tester.pump();
+    final compactWidth = tester.getSize(find.byKey(key)).width;
+    expect(compactWidth, lessThanOrEqualTo(560));
+
+    tester.view.physicalSize = const Size(768, 1024);
+    tester.binding.handleMetricsChanged();
+    await tester.pump();
+
+    final tabletWidth = tester.getSize(find.byKey(key)).width;
+    expect(tabletWidth, greaterThan(600));
+    expect(tabletWidth, lessThanOrEqualTo(760));
+  });
+
   testWidgets('reduced-motion splash completes without waiting', (
     tester,
   ) async {
