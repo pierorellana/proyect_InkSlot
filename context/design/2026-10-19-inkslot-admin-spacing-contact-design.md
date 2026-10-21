@@ -42,6 +42,9 @@ aunque la operación actual solo requiere WhatsApp y correo.
   no quedar pegado al borde de la ventana.
 - Una solicitud nueva puede seleccionar WhatsApp o Correo, y el campo de dato
   cambia entre número y correo según la selección.
+- Al cambiar de canal se limpia el valor anterior para no reutilizar un correo
+  como WhatsApp ni un número como correo. WhatsApp y teléfono validan un formato
+  telefónico; Correo valida un email.
 - Solicitudes existentes con Instagram o teléfono siguen renderizándose porque
   esos valores no se eliminan del dominio ni del contrato HTTP.
 

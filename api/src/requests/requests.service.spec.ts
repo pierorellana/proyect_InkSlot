@@ -328,6 +328,10 @@ describe('BookingRequestsService administration', () => {
       'INVALID_CONTACT',
     ],
     [
+      { contactChannel: 'whatsapp', contactValue: 'contact@example.test' },
+      'INVALID_CONTACT',
+    ],
+    [
       { contactChannel: 'phone', contactValue: '1'.repeat(33) },
       'INVALID_CONTACT',
     ],

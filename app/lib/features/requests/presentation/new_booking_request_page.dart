@@ -203,7 +203,11 @@ class _NewBookingRequestPageState extends State<NewBookingRequestPage> {
           ContactChannelField(
             channel: _channel,
             controller: _contactController,
-            onChannelChanged: (channel) => setState(() => _channel = channel),
+            onChannelChanged: (channel) {
+              if (channel == _channel) return;
+              _contactController.clear();
+              setState(() => _channel = channel);
+            },
             onChanged: (_) => setState(() {}),
             errorText: contactText.trim().isEmpty
                 ? null

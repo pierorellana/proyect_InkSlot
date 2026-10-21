@@ -13,6 +13,7 @@ import 'package:inkslot_app/features/requests/domain/booking_request_status.dart
 import 'package:inkslot_app/features/requests/presentation/booking_requests_controller.dart';
 import 'package:inkslot_app/features/requests/presentation/link_ready_page.dart';
 import 'package:inkslot_app/features/requests/presentation/new_booking_request_page.dart';
+import 'package:inkslot_app/features/requests/presentation/widgets/contact_channel_field.dart';
 
 Widget _app({required Widget home}) => MaterialApp(
   theme: buildInkSlotTheme(),
@@ -157,6 +158,39 @@ void main() {
 
     expect(find.text('Correo electrónico'), findsOneWidget);
     expect(find.text('cliente@correo.com'), findsOneWidget);
+  });
+
+  testWidgets('clears the contact value when switching channels', (
+    tester,
+  ) async {
+    usePhoneView(tester);
+    final controller = BookingRequestsController(
+      RecordingBookingRequestsRepository(),
+    );
+    await tester.pumpWidget(
+      _app(
+        home: Scaffold(body: NewBookingRequestHarness(controller: controller)),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Correo'));
+    await tester.enterText(find.byType(TextField).at(1), 'cliente@correo.com');
+    await tester.tap(find.text('WhatsApp'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('cliente@correo.com'), findsNothing);
+    expect(find.text('Número de WhatsApp'), findsOneWidget);
+  });
+
+  test('rejects an email as a WhatsApp value', () {
+    expect(
+      ContactChannelField.validate(
+        ContactChannel.whatsapp,
+        'cliente@correo.com',
+      ),
+      isNotNull,
+    );
   });
 
   testWidgets('adjusts the duration in 30 minute steps', (tester) async {

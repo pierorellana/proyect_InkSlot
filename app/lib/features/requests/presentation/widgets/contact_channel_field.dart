@@ -5,6 +5,8 @@ import '../../domain/booking_request_status.dart';
 
 /// Canal de contacto (`.seg`) y dato de contacto (`.fld`).
 class ContactChannelField extends StatelessWidget {
+  static final _phonePattern = RegExp(r'^\+?[0-9][0-9\s().-]{6,31}$');
+
   static const _availableChannels = <ContactChannel>[
     ContactChannel.whatsapp,
     ContactChannel.email,
@@ -34,6 +36,11 @@ class ContactChannelField extends StatelessWidget {
     if (channel == ContactChannel.email &&
         (!text.contains('@') || !text.contains('.'))) {
       return 'Revisa el formato del correo.';
+    }
+    if ((channel == ContactChannel.whatsapp ||
+            channel == ContactChannel.phone) &&
+        !_phonePattern.hasMatch(text)) {
+      return 'Ingresa un número de teléfono válido.';
     }
     if (channel == ContactChannel.instagram && text.length > 64) {
       return 'Usa máximo 64 caracteres.';

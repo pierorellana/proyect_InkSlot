@@ -77,6 +77,8 @@ type NormalizedContact = {
   value: string;
 };
 
+const PHONE_PATTERN = /^\+?[0-9][0-9\s().-]{6,31}$/;
+
 export type BookingRequestResponse = {
   id: string;
   client: {
@@ -781,6 +783,15 @@ export class BookingRequestsService {
       throw badRequest(
         'INVALID_CONTACT',
         'El teléfono de contacto no puede superar 32 caracteres',
+      );
+    }
+    if (
+      (channel === 'whatsapp' || channel === 'phone') &&
+      !PHONE_PATTERN.test(value)
+    ) {
+      throw badRequest(
+        'INVALID_CONTACT',
+        'El teléfono de contacto no es válido',
       );
     }
     if (channel === 'instagram' && value.length > 64) {
