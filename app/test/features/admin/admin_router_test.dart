@@ -259,6 +259,19 @@ void main() {
     expect(find.text('Cerrar sesión'), findsOneWidget);
     expect(_press('Abrir menú'), findsNothing);
 
+    tester.view.physicalSize = const Size(768, 900);
+    tester.binding.handleMetricsChanged();
+    await tester.pumpAndSettle();
+    expect(_press('Abrir menú'), findsNothing);
+    expect(_press('Inicio'), findsOneWidget);
+    expect(find.text('Cerrar sesión'), findsNothing);
+    await tester.tap(_press('Enlaces'));
+    await tester.pumpAndSettle();
+    expect(
+      router.routerDelegate.currentConfiguration.uri.path,
+      '/admin/requests',
+    );
+
     tester.view.physicalSize = const Size(390, 844);
     tester.binding.handleMetricsChanged();
     await tester.pumpAndSettle();
